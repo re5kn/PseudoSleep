@@ -87,19 +87,19 @@ func _draw_icon(bob: float) -> void:
 
 
 func _draw_exclaims() -> void:
-	var gap := 56.0
-	for i in exclaim_count:
-		var x := (i - (exclaim_count - 1) / 2.0) * gap
-		var c := Vector2(x, ICON_POS.y)
-		draw_set_transform(c, 0.0, Vector2.ONE * exclaim_anim)
-		var burst := PackedVector2Array()
-		for k in 16:
-			var r := 30.0 if k % 2 == 0 else 21.0
-			var a := TAU * k / 16.0 - PI / 2
-			burst.append(Vector2(cos(a), sin(a)) * r)
-		draw_colored_polygon(burst, Color("ffd93b"))
-		ItemArt.outline(self, burst, Color("e2483d"), 3.0)
-		var pos := Vector2(-30, 13)
-		draw_string_outline(FONT, pos, "！", HORIZONTAL_ALIGNMENT_CENTER, 60, 38, 6, Color.WHITE)
-		draw_string(FONT, pos, "！", HORIZONTAL_ALIGNMENT_CENTER, 60, 38, Color("e2483d"))
+	# ストック2回分なら1つの吹き出しに「！！」を並べる
+	var text := "！".repeat(exclaim_count)
+	var stretch := 1.0 + 0.6 * (exclaim_count - 1)
+	draw_set_transform(Vector2(0, ICON_POS.y), 0.0, Vector2.ONE * exclaim_anim)
+	var burst := PackedVector2Array()
+	for k in 16:
+		var r := 30.0 if k % 2 == 0 else 21.0
+		var a := TAU * k / 16.0 - PI / 2
+		burst.append(Vector2(cos(a) * stretch, sin(a)) * r)
+	draw_colored_polygon(burst, Color("ffd93b"))
+	ItemArt.outline(self, burst, Color("e2483d"), 3.0)
+	var w := 60.0 * exclaim_count
+	var pos := Vector2(-w / 2, 13)
+	draw_string_outline(FONT, pos, text, HORIZONTAL_ALIGNMENT_CENTER, w, 38, 6, Color.WHITE)
+	draw_string(FONT, pos, text, HORIZONTAL_ALIGNMENT_CENTER, w, 38, Color("e2483d"))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
