@@ -8,6 +8,7 @@ const ItemPile = preload("res://scripts/item_pile.gd")
 const FlyingItem = preload("res://scripts/flying_item.gd")
 const StorageBox = preload("res://scripts/storage_box.gd")
 const ItemIcon = preload("res://scripts/item_icon.gd")
+const SettingsPanel = preload("res://scripts/settings_panel.gd")
 const FONT = preload("res://fonts/MPLUSRounded1c-Bold.ttf")
 
 const VIEW_SIZE := Vector2(720, 1280)
@@ -23,6 +24,9 @@ const TOAST_SEC := 2.5
 const CUTIN_PAUSE_SEC := 0.9
 const REPEAT_DELAY_SEC := 0.4
 const REPEAT_INTERVAL_SEC := 0.08
+## 設定パネルの幅。ブラウザの幅が VIEW_SIZE.x + これ以上あれば、フィールドと並べて表示する
+const SETTINGS_W := 470.0
+const SETTINGS_SLIDE_SEC := 0.22
 
 const TEXT_DARK := Color("5a4632")
 const CREAM := Color("fff7e6")
@@ -50,7 +54,6 @@ var hud_label: Label
 var hours_label: Label
 var advance_button: Button
 var genki_button: Button
-var stock_button: Button
 var status_label: Label
 var toast_box: VBoxContainer
 var box_popup: PanelContainer
@@ -59,6 +62,12 @@ var box_popup_timer: SceneTreeTimer
 var bubble: PanelContainer
 var bubble_label: Label
 var blocker: Control
+var settings: SettingsPanel
+var settings_scrim: ColorRect
+var settings_open := false
+## 0＝閉じている、1＝せり出しきった状態
+var settings_slide := 0.0
+var settings_tween: Tween
 
 
 func _ready() -> void:
@@ -69,6 +78,7 @@ func _ready() -> void:
 	_build_field()
 	_build_panel()
 	_build_overlays()
+	_build_settings()
 	_refresh()
 	get_viewport().size_changed.connect(_center_layers)
 	_center_layers()
@@ -76,11 +86,31 @@ func _ready() -> void:
 
 # ---------------------------------------------------------------- 画面の組み立て
 
-## 横（縦長の端末では縦）に余った領域は背景色のまま、将来の操作UI用に空けておく
+## 縦長の画面を中央に置く。横に余った領域は背景色のまま。
+## 幅が広く設定パネルを並べて出せるときは、パネルと重ならないようフィールドを右へ寄せる。
 func _center_layers() -> void:
-	var offset := ((get_viewport().get_visible_rect().size - VIEW_SIZE) / 2).floor()
+	var view := get_viewport().get_visible_rect().size
+	var offset := ((view - VIEW_SIZE) / 2).floor()
+	if _is_wide():
+		offset.x = floorf(lerpf(offset.x, maxf(offset.x, SETTINGS_W), settings_slide))
 	for layer in layers:
 		layer.offset = offset
+	if settings != null:
+		settings.size = Vector2(_settings_width(), view.y)
+		settings.position = Vector2(-settings.size.x * (1.0 - settings_slide), 0)
+		settings.visible = settings_slide > 0.0
+		settings_scrim.size = view
+		settings_scrim.visible = settings_open and not _is_wide()
+		settings_scrim.modulate.a = settings_slide
+
+
+func _is_wide() -> bool:
+	return get_viewport().get_visible_rect().size.x >= VIEW_SIZE.x + SETTINGS_W
+
+
+func _settings_width() -> float:
+	# 狭い画面では外側をタップして閉じられるよう、右に少し隙間を残す
+	return minf(SETTINGS_W, get_viewport().get_visible_rect().size.x - 80.0)
 
 
 func _layer(n: int) -> CanvasLayer:
@@ -186,9 +216,6 @@ func _build_panel() -> void:
 	genki_button = _toggle()
 	genki_button.pressed.connect(_on_genki_toggled)
 	row2.add_child(genki_button)
-	stock_button = _toggle()
-	stock_button.pressed.connect(_on_stock_toggled)
-	row2.add_child(stock_button)
 	var reset := _button("リセット", Color("e5534b"), Color.WHITE)
 	reset.add_theme_font_size_override("font_size", 18)
 	reset.pressed.connect(_on_reset)
@@ -248,6 +275,53 @@ func _build_overlays() -> void:
 	blocker.visible = false
 	blocker.gui_input.connect(_on_blocker_input)
 	blocker_layer.add_child(blocker)
+
+
+## 設定パネルは画面の左端に付けるので、中央寄せのずらし（_layer）は使わない
+func _build_settings() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 6
+	add_child(layer)
+	# 狭い画面ではパネルがフィールドに重なる。外側のタップはここで受けて閉じる
+	settings_scrim = ColorRect.new()
+	settings_scrim.color = Color(0, 0, 0, 0.35)
+	settings_scrim.visible = false
+	settings_scrim.mouse_filter = Control.MOUSE_FILTER_STOP
+	settings_scrim.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed:
+			_set_settings_open(false))
+	layer.add_child(settings_scrim)
+	settings = SettingsPanel.new()
+	settings.setup(sim.params, ui_theme)
+	settings.visible = false
+	settings.changed.connect(_on_params_changed)
+	settings.close_requested.connect(_set_settings_open.bind(false))
+	layer.add_child(settings)
+
+
+func _set_settings_open(open: bool) -> void:
+	if open == settings_open:
+		return
+	settings_open = open
+	if not open:
+		# 入力途中の数値を確定させる
+		get_viewport().gui_release_focus()
+	if settings_tween != null:
+		settings_tween.kill()
+	settings_tween = create_tween()
+	settings_tween.tween_method(_set_settings_slide, settings_slide, 1.0 if open else 0.0, SETTINGS_SLIDE_SEC) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_center_layers()
+
+
+func _set_settings_slide(t: float) -> void:
+	settings_slide = t
+	_center_layers()
+
+
+func _on_params_changed() -> void:
+	sim.skill_stock = mini(sim.skill_stock, sim.params.max_skill_stock)
+	_refresh()
 
 
 func _style(color: Color, radius: int, pad: float) -> StyleBoxFlat:
@@ -329,12 +403,6 @@ func _on_genki_toggled() -> void:
 	_refresh()
 
 
-func _on_stock_toggled() -> void:
-	sim.params.max_skill_stock = 2 if sim.params.max_skill_stock == 1 else 1
-	sim.skill_stock = mini(sim.skill_stock, sim.params.max_skill_stock)
-	_refresh()
-
-
 func _on_reset() -> void:
 	if cutin_active:
 		return
@@ -362,6 +430,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if p.y > FIELD_HEIGHT or cutin_active:
 		return
 	get_viewport().set_input_as_handled()
+	# 設定パネルの入力欄を編集中なら確定させる
+	get_viewport().gui_release_focus()
 	# 押したままフィールド上をなぞると、通った山を回収する
 	swiping = true
 	swipe_last = p
@@ -373,8 +443,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			swiped[id] = true
 			_collect(id)
 			return
-	if pseudon.hit(p) and sim.has_icon():
-		_on_pseudon_tap()
+	if pseudon.hit(p):
+		# アイコンが出ていなければ設定パネルを開け閉めする
+		if sim.has_icon():
+			_on_pseudon_tap()
+		else:
+			_set_settings_open(not settings_open)
 		return
 	if berry_box.hit(p):
 		if not had_popup or box_popup.get_meta("kind", -1) != StorageBox.Kind.BERRY:
@@ -581,9 +655,9 @@ func _refresh() -> void:
 	hours_label.text = "%d時間" % hours
 	advance_button.text = "%d時間分すすめる" % hours
 	genki_button.text = "げんき：81以上で固定" if sim.genki_mode == Sim.GenkiMode.ALWAYS_HIGH else "げんき：100から減少"
-	stock_button.text = "ストック上限：%d" % sim.params.max_skill_stock
 	var genki := "81以上" if sim.genki_mode == Sim.GenkiMode.ALWAYS_HIGH else str(sim.genki_at(sim.elapsed_sec))
-	hud_label.text = "経過 %s ・ げんき %s" % [_format_hours(sim.elapsed_sec), genki]
+	hud_label.text = "%s（Lv.%d）\n経過 %s ・ げんき %s" % [
+		sim.params.pseudon_name, sim.params.level, _format_hours(sim.elapsed_sec), genki]
 
 	pseudon.show_icon = sim.has_icon()
 	pseudon.icon_full = sim.is_full()
@@ -604,5 +678,5 @@ func _refresh() -> void:
 			extra = "　いつのまに育成%d回" % r["full_helps"]
 		lines.append("獲得：" + "・".join(parts) + extra)
 	lines.append("所持 %d/%d　スキルストック %d/%d" % [
-		sim.held_count(), sim.params.max_carry, sim.skill_stock, sim.params.max_skill_stock])
+		sim.held_count(), sim.params.carry_limit(), sim.skill_stock, sim.params.max_skill_stock])
 	status_label.text = "\n".join(lines)

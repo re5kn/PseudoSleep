@@ -2,6 +2,7 @@ extends SceneTree
 ## ロジックのテスト。 godot --headless -s res://tests/test_sim.gd で実行する。
 ## 基礎資料「おてつだい計算モデル」の計算例その1・その2と突き合わせる。
 ## 計算例はレベル補正なし・最大所持数25・食材2枠なので、そのパラメータを組んで使う。
+## 計算例は毎回タップする前提なので、スキルのストックも毎回空にしながら進める。
 
 const Sim = preload("res://scripts/sim.gd")
 const Params = preload("res://scripts/params.gd")
@@ -12,6 +13,9 @@ var failures := 0
 func _init() -> void:
 	_test_level_factor()
 	_test_default_params()
+	_test_modifiers()
+	_test_slots_by_level()
+	_test_skill_ceiling()
 	_test_example1_help_count()
 	_test_example2_help_count()
 	_test_carry_over()
@@ -40,8 +44,13 @@ func _example_params() -> Params:
 	var p := Params.new()
 	p.base_help_sec = 2600.0
 	p.level = 1
+	p.ingredient_prob = 0.25
+	p.skill_prob = 0.05
+	p.skill_ceiling = 78
 	p.max_carry = 25
+	p.berries_per_help = 2
 	p.max_skill_stock = 1
+	p.unlock_slots_by_level = false
 	p.ingredients = [
 		{"id": "ing_a", "name": "食材A", "amount": 2},
 		{"id": "ing_b", "name": "食材B", "amount": 3},
@@ -67,32 +76,116 @@ func _test_level_factor() -> void:
 
 
 func _test_default_params() -> void:
-	print("現在の初期パラメータ（基準2600秒・Lv.60・最大所持数28・スキルストック2・食材2/3/5個）")
+	print("初期パラメータ（基準2200秒・Lv.60・最大所持数22・スキルストック2・天井65・食材1/2/4個）")
 	var p := Params.new()
-	check(p.help_sec() == 2293.0, "2600秒×0.882=2293.2は2293秒 (got %f)" % p.help_sec())
-	check(p.max_carry == 28, "最大所持数28")
+	check(p.help_sec() == 1940.0, "2200秒×0.882=1940.4は1940秒 (got %f)" % p.help_sec())
+	check(p.carry_limit() == 22, "最大所持数22")
 	check(p.max_skill_stock == 2, "スキルストック上限2")
+	check(p.skill_ceiling == 65, "スキル発生天井65")
+	check(_near(p.ingredient_chance(), 0.151, 1e-9) and _near(p.skill_chance(), 0.039, 1e-9), "食材確率15.1%・スキル確率3.9%")
+	check(p.berry_amount() == 1, "きのみ1個")
 	var amounts := []
 	for ing in p.ingredients:
 		amounts.append(ing["amount"])
-	check(amounts == [2, 3, 5], "食材枠の数 2/3/5 (got %s)" % str(amounts))
+	check(amounts == [1, 2, 4], "食材枠の数 1/2/4 (got %s)" % str(amounts))
 	p.max_carry = 1000000
 	var s := Sim.new(p)
 	var r := s.advance(16 * 3600.0)
-	# 57600 ÷ (2293×0.45) = 55.8…
-	check(r["helps"] == 55, "げんき81以上16時間でおてつだい55回 (got %d)" % r["helps"])
+	# 57600 ÷ (1940×0.45) = 65.9…
+	check(r["helps"] == 65, "げんき81以上16時間でおてつだい65回 (got %d)" % r["helps"])
 	# 食材枠は3枠から等確率
 	var counts := {"ing_a": 0, "ing_b": 0, "ing_c": 0}
 	s.rng.seed = 42
 	for i in 3000:
 		s.reset()
 		var items: Dictionary = s.advance(16 * 3600.0)["items"]
-		counts["ing_a"] += int(items.get("ing_a", 0)) / 2
-		counts["ing_b"] += int(items.get("ing_b", 0)) / 3
-		counts["ing_c"] += int(items.get("ing_c", 0)) / 5
+		counts["ing_a"] += int(items.get("ing_a", 0)) / 1
+		counts["ing_b"] += int(items.get("ing_b", 0)) / 2
+		counts["ing_c"] += int(items.get("ing_c", 0)) / 4
 	var total := float(counts["ing_a"] + counts["ing_b"] + counts["ing_c"])
 	for id in counts:
 		check(_near(counts[id] / total, 1.0 / 3.0, 0.02), "%sが選ばれる割合 約1/3 (got %.3f)" % [id, counts[id] / total])
+
+
+func _test_modifiers() -> void:
+	print("サブスキル・せいかく・おやすみリボンの補正")
+	var p := Params.new()
+	p.base_help_sec = 2400.0
+	p.subskills = {"speed_m": true}
+	# 基礎資料の計算例: 2400×0.882×0.86 = 1820.448
+	check(p.help_sec() == 1820.0, "おてつだいスピードMで1820秒 (got %f)" % p.help_sec())
+	p.subskills = {"speed_m": true, "speed_s": true, "help_bonus": true}
+	p.other_help_bonus = 4
+	# 0.14+0.07+0.05×5 = 0.46 → 上限0.35
+	check(_near(p.speed_reduction(), 0.35, 1e-9), "短縮は35%%で頭打ち (got %f)" % p.speed_reduction())
+	p.subskills = {"help_bonus": true}
+	p.other_help_bonus = 2
+	check(_near(p.speed_reduction(), 0.15, 1e-9), "おてつだいボーナス自分1＋他2で15%%")
+	p.subskills = {}
+	p.other_help_bonus = 0
+	p.nature_up = Params.Nature.SPEED
+	check(p.help_sec() == floorf(2400.0 * 0.882 * 0.9), "せいかくでおてつだいスピード上昇は時間0.9倍")
+	p.nature_up = Params.Nature.NONE
+	p.nature_down = Params.Nature.SPEED
+	check(p.help_sec() == floorf(2400.0 * 0.882 * 1.075), "せいかくでおてつだいスピード下降は時間1.075倍")
+	p.nature_down = Params.Nature.NONE
+	p.ribbon_sleep_hours = 2000
+	check(p.help_sec() == floorf(2400.0 * 0.882), "最終進化形はリボンで時間が変わらない")
+	check(p.carry_limit() == 22 + 8, "リボン2000時間で最大所持数+8")
+	p.evolutions_left = 1
+	check(p.help_sec() == floorf(2400.0 * 0.882 * 0.88), "あと1回進化・2000時間で0.88倍")
+	p.evolutions_left = 2
+	p.ribbon_sleep_hours = 500
+	check(p.help_sec() == floorf(2400.0 * 0.882 * 0.89), "あと2回進化・500時間で0.89倍")
+	check(p.carry_limit() == 22 + 3, "リボン500時間で最大所持数+3")
+	p.ribbon_sleep_hours = 199
+	check(p.help_sec() == floorf(2400.0 * 0.882) and p.carry_limit() == 22, "200時間未満は補正なし")
+	p.subskills = {"carry_l": true, "carry_m": true, "carry_s": true, "berry_s": true}
+	check(p.carry_limit() == 22 + 18 + 12 + 6, "最大所持数アップL・M・S")
+	check(p.berry_amount() == 2, "きのみの数Sで+1個")
+	p.ingredient_prob = 0.2
+	p.skill_prob = 0.05
+	p.subskills = {"ing_m": true, "ing_s": true, "skill_s": true}
+	p.nature_up = Params.Nature.INGREDIENT
+	p.nature_down = Params.Nature.SKILL
+	check(_near(p.ingredient_chance(), 0.2 * 1.2 * 1.54, 1e-9), "食材確率 = 基準×せいかく1.2×(1+0.36+0.18) (got %f)" % p.ingredient_chance())
+	check(_near(p.skill_chance(), 0.05 * 0.8 * 1.18, 1e-9), "スキル確率 = 基準×せいかく0.8×(1+0.18) (got %f)" % p.skill_chance())
+
+
+func _test_slots_by_level() -> void:
+	print("レベルによる食材枠の解放")
+	var p := Params.new()
+	p.level = 29
+	check(p.active_ingredients().size() == 1, "Lv.29は1枠")
+	p.level = 30
+	check(p.active_ingredients().size() == 2, "Lv.30で2枠")
+	p.level = 60
+	check(p.active_ingredients().size() == 3, "Lv.60で3枠")
+	p.level = 10
+	p.ingredient_prob = 1.0
+	p.max_carry = 1000000
+	var s := Sim.new(p)
+	var items: Dictionary = s.advance(16 * 3600.0)["items"]
+	check(not items.has("ing_b") and not items.has("ing_c"), "未解放の枠の食材は出ない")
+
+
+func _test_skill_ceiling() -> void:
+	print("スキル発生の天井")
+	var p := Params.new()
+	p.max_carry = 1000000
+	p.skill_prob = 0.0
+	p.skill_ceiling = 5
+	p.max_skill_stock = 1
+	var s := Sim.new(p)
+	var r := s.advance(p.help_sec() * 0.45 * 4 + 1)
+	check(r["helps"] == 4 and r["skills"] == 0, "4回目までは発動しない (helps %d, skills %d)" % [r["helps"], r["skills"]])
+	r = s.advance(p.help_sec() * 0.45)
+	check(r["skills"] == 1 and r["skill_ceiling_hits"] == 1, "5回目で必ず発動")
+	r = s.advance(p.help_sec() * 0.45 * 20)
+	check(r["skills"] == 0 and s.skill_miss == 0, "ストックが上限のあいだは抽選せず、不発カウントも0のまま")
+	s.drop()
+	r = s.advance(p.help_sec() * 0.45 * 5)
+	check(r["skills"] == 1, "タップ後はまた5回目で発動 (got %d)" % r["skills"])
 
 
 func _test_example1_help_count() -> void:
@@ -121,6 +214,18 @@ func _test_carry_over() -> void:
 	check(n == 49, "1時間×16回でも49回 (got %d)" % n)
 
 
+## おてつだい1回ごとにタップする（おてつだい間隔より短い刻みで進め、そのたびにストックを空にする）
+func _advance_tapping(s: Sim, seconds: float) -> Dictionary:
+	var step := 1100.0
+	var t := 0.0
+	while t < seconds:
+		var d := minf(step, seconds - t)
+		s.advance(d)
+		s.drop()
+		t += d
+	return s.totals
+
+
 func _run_many(decay: bool, trials: int) -> Dictionary:
 	var acc := {"ing": 0.0, "skill": 0.0, "berry_items": 0.0, "ing_items": 0.0, "skill0": 0}
 	for i in trials:
@@ -128,7 +233,7 @@ func _run_many(decay: bool, trials: int) -> Dictionary:
 		s.rng.seed = 1000 + i
 		if decay:
 			s.set_genki_mode(Sim.GenkiMode.DECAY)
-		var r := s.advance(16 * 3600.0)
+		var r := _advance_tapping(s, 16 * 3600.0)
 		acc["ing"] += r["ingredient_helps"]
 		acc["skill"] += r["skills"]
 		var items: Dictionary = r["items"]
