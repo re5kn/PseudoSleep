@@ -26,7 +26,7 @@ const TEXT_DARK := Color("5a4632")
 const CREAM := Color("fff7e6")
 
 var sim: Sim
-var hours := 16
+var hours := 3
 var last_result := {}
 var piles := {}
 var cutin_active := false
