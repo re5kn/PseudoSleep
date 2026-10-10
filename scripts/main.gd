@@ -41,8 +41,8 @@ var dim: ColorRect
 var hud_label: Label
 var hours_label: Label
 var advance_button: Button
-var genki_option: OptionButton
-var stock_option: OptionButton
+var genki_button: Button
+var stock_button: Button
 var status_label: Label
 var toast_box: VBoxContainer
 var box_popup: PanelContainer
@@ -159,12 +159,13 @@ func _build_panel() -> void:
 	var row2 := HBoxContainer.new()
 	row2.add_theme_constant_override("separation", 8)
 	v.add_child(row2)
-	genki_option = _option(["げんき 81以上で固定", "げんき 100から減少"])
-	genki_option.item_selected.connect(_on_genki_selected)
-	row2.add_child(genki_option)
-	stock_option = _option(["ストック上限 1", "ストック上限 2"])
-	stock_option.item_selected.connect(_on_stock_selected)
-	row2.add_child(stock_option)
+	# タップで切り替えるトグル
+	genki_button = _toggle()
+	genki_button.pressed.connect(_on_genki_toggled)
+	row2.add_child(genki_button)
+	stock_button = _toggle()
+	stock_button.pressed.connect(_on_stock_toggled)
+	row2.add_child(stock_button)
 	var reset := _button("リセット", Color("ffe9bf"), TEXT_DARK)
 	reset.add_theme_font_size_override("font_size", 18)
 	reset.pressed.connect(_on_reset)
@@ -269,16 +270,11 @@ func _button(text: String, color: Color, text_color: Color) -> Button:
 	return b
 
 
-func _option(items: Array) -> OptionButton:
-	var o := OptionButton.new()
-	for item in items:
-		o.add_item(item)
-	o.select(0)
-	o.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	o.add_theme_font_size_override("font_size", 18)
-	_apply_button_styles(o, Color("ffe9bf"), TEXT_DARK)
-	o.get_popup().add_theme_font_size_override("font_size", 22)
-	return o
+func _toggle() -> Button:
+	var b := _button("", Color("ffe9bf"), TEXT_DARK)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.add_theme_font_size_override("font_size", 18)
+	return b
 
 
 # ---------------------------------------------------------------- 操作
@@ -296,13 +292,14 @@ func _on_advance() -> void:
 	_refresh()
 
 
-func _on_genki_selected(index: int) -> void:
-	sim.set_genki_mode(Sim.GenkiMode.DECAY if index == 1 else Sim.GenkiMode.ALWAYS_HIGH)
+func _on_genki_toggled() -> void:
+	var decay := sim.genki_mode == Sim.GenkiMode.ALWAYS_HIGH
+	sim.set_genki_mode(Sim.GenkiMode.DECAY if decay else Sim.GenkiMode.ALWAYS_HIGH)
 	_refresh()
 
 
-func _on_stock_selected(index: int) -> void:
-	sim.params.max_skill_stock = index + 1
+func _on_stock_toggled() -> void:
+	sim.params.max_skill_stock = 2 if sim.params.max_skill_stock == 1 else 1
 	sim.skill_stock = mini(sim.skill_stock, sim.params.max_skill_stock)
 	_refresh()
 
@@ -521,6 +518,8 @@ func _format_hours(sec: float) -> String:
 func _refresh() -> void:
 	hours_label.text = "%d時間" % hours
 	advance_button.text = "%d時間分すすめる" % hours
+	genki_button.text = "げんき：81以上で固定" if sim.genki_mode == Sim.GenkiMode.ALWAYS_HIGH else "げんき：100から減少"
+	stock_button.text = "ストック上限：%d" % sim.params.max_skill_stock
 	var genki := "81以上" if sim.genki_mode == Sim.GenkiMode.ALWAYS_HIGH else str(sim.genki_at(sim.elapsed_sec))
 	hud_label.text = "経過 %s ・ げんき %s" % [_format_hours(sim.elapsed_sec), genki]
 
