@@ -38,6 +38,8 @@ var swiping := false
 var swipe_last := Vector2.ZERO
 var swiped := {}
 
+## 縦長の画面（VIEW_SIZE）をブラウザの中央に置くため、全レイヤーを同じだけずらす
+var layers: Array[CanvasLayer] = []
 var ui_theme: Theme
 var actor_root: Node2D
 var pseudon: PseudonView
@@ -68,20 +70,36 @@ func _ready() -> void:
 	_build_panel()
 	_build_overlays()
 	_refresh()
+	get_viewport().size_changed.connect(_center_layers)
+	_center_layers()
 
 
 # ---------------------------------------------------------------- 画面の組み立て
+
+## 横（縦長の端末では縦）に余った領域は背景色のまま、将来の操作UI用に空けておく
+func _center_layers() -> void:
+	var offset := ((get_viewport().get_visible_rect().size - VIEW_SIZE) / 2).floor()
+	for layer in layers:
+		layer.offset = offset
+
 
 func _layer(n: int) -> CanvasLayer:
 	var layer := CanvasLayer.new()
 	layer.layer = n
 	add_child(layer)
+	layers.append(layer)
 	return layer
 
 
 func _build_field() -> void:
 	var field := _layer(0)
-	field.add_child(FieldBackground.new())
+	# 背景の波や影がフィールドの外へはみ出さないよう切り取る
+	var field_clip := Control.new()
+	field_clip.size = Vector2(VIEW_SIZE.x, FIELD_HEIGHT)
+	field_clip.clip_contents = true
+	field_clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	field_clip.add_child(FieldBackground.new())
+	field.add_child(field_clip)
 
 	ingredient_box = StorageBox.new()
 	ingredient_box.kind = StorageBox.Kind.INGREDIENT
