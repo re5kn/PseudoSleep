@@ -41,6 +41,7 @@ func _example_params() -> Params:
 	p.base_help_sec = 2600.0
 	p.level = 1
 	p.max_carry = 25
+	p.max_skill_stock = 1
 	p.ingredients = [
 		{"id": "ing_a", "name": "食材A", "amount": 2},
 		{"id": "ing_b", "name": "食材B", "amount": 3},
@@ -66,10 +67,11 @@ func _test_level_factor() -> void:
 
 
 func _test_default_params() -> void:
-	print("現在の初期パラメータ（基準2600秒・Lv.60・最大所持数28・食材2/3/5個）")
+	print("現在の初期パラメータ（基準2600秒・Lv.60・最大所持数28・スキルストック2・食材2/3/5個）")
 	var p := Params.new()
 	check(p.help_sec() == 2293.0, "2600秒×0.882=2293.2は2293秒 (got %f)" % p.help_sec())
 	check(p.max_carry == 28, "最大所持数28")
+	check(p.max_skill_stock == 2, "スキルストック上限2")
 	var amounts := []
 	for ing in p.ingredients:
 		amounts.append(ing["amount"])
@@ -185,6 +187,7 @@ func _test_skill_stock() -> void:
 	print("スキルのストック上限")
 	var p := Params.new()
 	p.max_carry = 1000000
+	p.max_skill_stock = 1
 	p.skill_prob = 1.0
 	var s := Sim.new(p)
 	s.advance(3600.0 * 5)

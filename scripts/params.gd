@@ -14,7 +14,7 @@ var max_carry := 28
 ## 1回のおてつだいで拾うきのみの数
 var berries_per_help := 2
 ## メインスキルのストック上限（スキルとくいは2、それ以外は1）
-var max_skill_stock := 1
+var max_skill_stock := 2
 
 var berry := {"id": "berry", "name": "きのみ"}
 ## 解放済みの食材枠。食材を拾うときは等確率でどれか1枠が選ばれる。
