@@ -166,7 +166,7 @@ func _build_panel() -> void:
 	stock_button = _toggle()
 	stock_button.pressed.connect(_on_stock_toggled)
 	row2.add_child(stock_button)
-	var reset := _button("リセット", Color("ffe9bf"), TEXT_DARK)
+	var reset := _button("リセット", Color("e5534b"), Color.WHITE)
 	reset.add_theme_font_size_override("font_size", 18)
 	reset.pressed.connect(_on_reset)
 	row2.add_child(reset)
