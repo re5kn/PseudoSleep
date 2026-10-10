@@ -26,6 +26,8 @@ static func draw_item(ci: CanvasItem, id: String, c: Vector2, s: float = 1.0) ->
 			_apple(ci, c, s)
 		"ing_b":
 			_corn(ci, c, s)
+		"ing_c":
+			_egg(ci, c, s)
 		_:
 			ci.draw_circle(c, 12.0 * s, Color.WHITE)
 
@@ -73,3 +75,16 @@ static func _corn(ci: CanvasItem, c: Vector2, s: float) -> void:
 	ci.draw_colored_polygon(husk_r, Color("5cbf44"))
 	outline(ci, husk_l, OUTLINE, 1.2 * s)
 	outline(ci, husk_r, OUTLINE, 1.2 * s)
+
+
+static func _egg(ci: CanvasItem, c: Vector2, s: float) -> void:
+	var pts := PackedVector2Array()
+	for i in 28:
+		var a := TAU * i / 28
+		# 上をすこし細くした卵形
+		var rx := (10.5 + 1.8 * sin(a)) * s
+		pts.append(c + Vector2(cos(a) * rx, sin(a) * 13.5 * s))
+	ci.draw_colored_polygon(pts, Color("fff3dc"))
+	ci.draw_colored_polygon(ellipse(c + Vector2(3, 5) * s, 7.0 * s, 6.0 * s), Color("f3dfbd"))
+	outline(ci, pts, OUTLINE, 1.6 * s)
+	ci.draw_circle(c + Vector2(-4, -5) * s, 3.0 * s, Color(1, 1, 1, 0.9))

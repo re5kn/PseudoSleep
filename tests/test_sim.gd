@@ -1,6 +1,7 @@
 extends SceneTree
 ## ロジックのテスト。 godot --headless -s res://tests/test_sim.gd で実行する。
 ## 基礎資料「おてつだい計算モデル」の計算例その1・その2と突き合わせる。
+## 計算例はレベル補正なし・最大所持数25・食材2枠なので、そのパラメータを組んで使う。
 
 const Sim = preload("res://scripts/sim.gd")
 const Params = preload("res://scripts/params.gd")
@@ -9,6 +10,8 @@ var failures := 0
 
 
 func _init() -> void:
+	_test_level_factor()
+	_test_default_params()
 	_test_example1_help_count()
 	_test_example2_help_count()
 	_test_carry_over()
@@ -32,11 +35,62 @@ func check(cond: bool, label: String) -> void:
 		printerr("  FAIL ", label)
 
 
+## 計算例のパラメータ（基準2600秒・レベル補正なし・最大所持数25・食材2個/3個の2枠）
+func _example_params() -> Params:
+	var p := Params.new()
+	p.base_help_sec = 2600.0
+	p.level = 1
+	p.max_carry = 25
+	p.ingredients = [
+		{"id": "ing_a", "name": "食材A", "amount": 2},
+		{"id": "ing_b", "name": "食材B", "amount": 3},
+	]
+	return p
+
+
 func _tapping_sim() -> Sim:
 	# 「毎回タップ」は所持数があふれない状態なので、最大所持数を十分大きくして表す
-	var p := Params.new()
+	var p := _example_params()
 	p.max_carry = 1000000
 	return Sim.new(p)
+
+
+func _test_level_factor() -> void:
+	print("レベル補正")
+	check(Params.level_factor(1) == 1.0, "Lv.1は1")
+	check(_near(Params.level_factor(60), 0.882, 1e-9), "Lv.60は0.882 (got %f)" % Params.level_factor(60))
+	var p := Params.new()
+	p.base_help_sec = 2400.0
+	p.level = 60
+	check(p.help_sec() == 2116.0, "2400秒×0.882=2116.8は2116秒 (got %f)" % p.help_sec())
+
+
+func _test_default_params() -> void:
+	print("現在の初期パラメータ（基準2600秒・Lv.60・最大所持数28・食材2/3/5個）")
+	var p := Params.new()
+	check(p.help_sec() == 2293.0, "2600秒×0.882=2293.2は2293秒 (got %f)" % p.help_sec())
+	check(p.max_carry == 28, "最大所持数28")
+	var amounts := []
+	for ing in p.ingredients:
+		amounts.append(ing["amount"])
+	check(amounts == [2, 3, 5], "食材枠の数 2/3/5 (got %s)" % str(amounts))
+	p.max_carry = 1000000
+	var s := Sim.new(p)
+	var r := s.advance(16 * 3600.0)
+	# 57600 ÷ (2293×0.45) = 55.8…
+	check(r["helps"] == 55, "げんき81以上16時間でおてつだい55回 (got %d)" % r["helps"])
+	# 食材枠は3枠から等確率
+	var counts := {"ing_a": 0, "ing_b": 0, "ing_c": 0}
+	s.rng.seed = 42
+	for i in 3000:
+		s.reset()
+		var items: Dictionary = s.advance(16 * 3600.0)["items"]
+		counts["ing_a"] += int(items.get("ing_a", 0)) / 2
+		counts["ing_b"] += int(items.get("ing_b", 0)) / 3
+		counts["ing_c"] += int(items.get("ing_c", 0)) / 5
+	var total := float(counts["ing_a"] + counts["ing_b"] + counts["ing_c"])
+	for id in counts:
+		check(_near(counts[id] / total, 1.0 / 3.0, 0.02), "%sが選ばれる割合 約1/3 (got %.3f)" % [id, counts[id] / total])
 
 
 func _test_example1_help_count() -> void:
@@ -111,7 +165,7 @@ func _test_example2_distribution() -> void:
 
 func _test_capacity() -> void:
 	print("最大所持数25・タップなし")
-	var s := Sim.new()
+	var s := Sim.new(_example_params())
 	s.rng.seed = 7
 	var r := s.advance(16 * 3600.0)
 	check(s.held_count() == 25, "所持数は25で止まる (got %d)" % s.held_count())
