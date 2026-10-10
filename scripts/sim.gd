@@ -2,7 +2,8 @@ extends RefCounted
 ## おてつだいの試行シミュレーション。
 ##
 ## 期待値ではなく、1回ごとに乱数で結果を決める。
-## - おてつだいの間隔 = 基準時間 × げんき補正（そのおてつだいを始めた時点のげんき）
+## - おてつだいの間隔 = おてつだい時間 × げんき補正（そのおてつだいを始めた時点のげんき）
+##   おてつだい時間 = 基準時間 × レベル補正 を小数点以下切り捨て（Params.help_sec）
 ## - 1回のおてつだいで、確率 p で食材（解放済みの枠から等確率）、1−p できのみ
 ## - それとは独立に、確率 q でメインスキルが発動してストックに入る（上限を超えた分は消える）
 ## - 所持数（パチモンが持っている分＋フィールドに残っている分）が最大所持数に達していると
@@ -94,7 +95,7 @@ static func genki_multiplier(genki: int) -> float:
 
 
 func help_interval_at(t: float) -> float:
-	return params.base_help_sec * genki_multiplier(genki_at(t))
+	return params.help_sec() * genki_multiplier(genki_at(t))
 
 
 ## seconds 秒ぶんおてつだいを進め、その間の結果を返す。
