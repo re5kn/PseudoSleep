@@ -31,6 +31,10 @@ var last_result := {}
 var piles := {}
 var cutin_active := false
 var cutin_closable := false
+## なぞり回収中か、直前の指の位置、このなぞりで回収済みの山
+var swiping := false
+var swipe_last := Vector2.ZERO
+var swiped := {}
 
 var ui_theme: Theme
 var actor_root: Node2D
@@ -319,16 +323,27 @@ func _on_reset() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+		swiping = false
+		return
+	if event is InputEventMouseMotion and swiping and event.button_mask & MOUSE_BUTTON_MASK_LEFT:
+		_on_swipe(_field_pos(event))
+		return
 	if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
 		return
-	var p := actor_root.get_global_mouse_position()
+	var p := _field_pos(event)
 	if p.y > FIELD_HEIGHT or cutin_active:
 		return
 	get_viewport().set_input_as_handled()
+	# 押したままフィールド上をなぞると、通った山を回収する
+	swiping = true
+	swipe_last = p
+	swiped.clear()
 	var had_popup := box_popup.visible
 	_hide_box_popup()
 	for id in piles:
 		if piles[id].hit(p):
+			swiped[id] = true
 			_collect(id)
 			return
 	if pseudon.hit(p) and sim.has_icon():
@@ -342,6 +357,28 @@ func _unhandled_input(event: InputEvent) -> void:
 		if not had_popup or box_popup.get_meta("kind", -1) != StorageBox.Kind.INGREDIENT:
 			_show_box_popup(ingredient_box)
 		return
+
+
+func _field_pos(event: InputEventMouse) -> Vector2:
+	return actor_root.get_global_transform_with_canvas().affine_inverse() * event.position
+
+
+func _on_swipe(p: Vector2) -> void:
+	if cutin_active:
+		swiping = false
+		return
+	get_viewport().set_input_as_handled()
+	# 速くなぞっても取りこぼさないよう、前回の位置との間を細かく調べる
+	var steps := maxi(1, ceili(swipe_last.distance_to(p) / (ItemPile.HIT_RADIUS * 0.5)))
+	for i in range(1, steps + 1):
+		var q := swipe_last.lerp(p, float(i) / steps)
+		if q.y > FIELD_HEIGHT:
+			continue
+		for id in piles:
+			if not swiped.has(id) and piles[id].hit(q):
+				swiped[id] = true
+				_collect(id)
+	swipe_last = p
 
 
 func _on_pseudon_tap() -> void:

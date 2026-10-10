@@ -1,5 +1,5 @@
 extends Node2D
-## フィールドに置かれたきのみ・食材の山。タップで収容箱へ回収する。
+## フィールドに置かれたきのみ・食材の山。タップかなぞりで収容箱へ回収する。
 
 const ItemArt = preload("res://scripts/item_art.gd")
 const FONT = preload("res://fonts/MPLUSRounded1c-Bold.ttf")
