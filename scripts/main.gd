@@ -3,7 +3,7 @@ extends Node
 
 const Sim = preload("res://scripts/sim.gd")
 const FieldBackground = preload("res://scripts/field_background.gd")
-const PokemonView = preload("res://scripts/pokemon_view.gd")
+const PseudonView = preload("res://scripts/pseudon_view.gd")
 const ItemPile = preload("res://scripts/item_pile.gd")
 const FlyingItem = preload("res://scripts/flying_item.gd")
 const StorageBox = preload("res://scripts/storage_box.gd")
@@ -12,7 +12,7 @@ const FONT = preload("res://fonts/MPLUSRounded1c-Bold.ttf")
 
 const VIEW_SIZE := Vector2(720, 1280)
 const FIELD_HEIGHT := 1040.0
-const POKEMON_POS := Vector2(360, 505)
+const PSEUDON_POS := Vector2(360, 505)
 const PILE_Y := 640.0
 const PILE_GAP := 112.0
 const BERRY_BOX_POS := Vector2(575, 745)
@@ -34,7 +34,7 @@ var cutin_closable := false
 
 var ui_theme: Theme
 var actor_root: Node2D
-var pokemon: PokemonView
+var pseudon: PseudonView
 var berry_box: StorageBox
 var ingredient_box: StorageBox
 var dim: ColorRect
@@ -108,13 +108,13 @@ func _build_field() -> void:
 	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dim_layer.add_child(dim)
 
-	# ポケモンとドロップは暗転より手前に出す
+	# パチモンとドロップは暗転より手前に出す
 	var actors := _layer(3)
 	actor_root = Node2D.new()
 	actors.add_child(actor_root)
-	pokemon = PokemonView.new()
-	pokemon.position = POKEMON_POS
-	actor_root.add_child(pokemon)
+	pseudon = PseudonView.new()
+	pseudon.position = PSEUDON_POS
+	actor_root.add_child(pseudon)
 
 
 func _build_panel() -> void:
@@ -331,8 +331,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		if piles[id].hit(p):
 			_collect(id)
 			return
-	if pokemon.hit(p) and sim.has_icon():
-		_on_pokemon_tap()
+	if pseudon.hit(p) and sim.has_icon():
+		_on_pseudon_tap()
 		return
 	if berry_box.hit(p):
 		if not had_popup or box_popup.get_meta("kind", -1) != StorageBox.Kind.BERRY:
@@ -344,7 +344,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 
-func _on_pokemon_tap() -> void:
+func _on_pseudon_tap() -> void:
 	var result := sim.drop()
 	var stock: int = result["stock"]
 	_spawn_drops(result["items"])
@@ -371,7 +371,7 @@ func _collect(id: String) -> void:
 func _pile_position(id: String) -> Vector2:
 	var ids := sim.params.item_ids()
 	var i := ids.find(id)
-	return Vector2(POKEMON_POS.x + (i - (ids.size() - 1) / 2.0) * PILE_GAP, PILE_Y)
+	return Vector2(PSEUDON_POS.x + (i - (ids.size() - 1) / 2.0) * PILE_GAP, PILE_Y)
 
 
 func _get_pile(id: String) -> ItemPile:
@@ -404,7 +404,7 @@ func _launch(id: String, amount: int, pile: ItemPile, delay: float, k: int) -> v
 	var fly := FlyingItem.new()
 	fly.item_id = id
 	fly.visible = false
-	var from := POKEMON_POS + Vector2(0, 10)
+	var from := PSEUDON_POS + Vector2(0, 10)
 	var to := pile.position + Vector2((k % 3 - 1) * 10, -8)
 	fly.position = from
 	actor_root.add_child(fly)
@@ -434,7 +434,7 @@ func _start_cutin(stock: int) -> void:
 	_hide_box_popup()
 	blocker.visible = true
 	create_tween().tween_property(dim, "modulate:a", 1.0, 0.15)
-	pokemon.show_exclaims(stock)
+	pseudon.show_exclaims(stock)
 	await get_tree().create_timer(CUTIN_PAUSE_SEC).timeout
 	if not cutin_active:
 		return
@@ -456,7 +456,7 @@ func _end_cutin() -> void:
 	cutin_closable = false
 	bubble.visible = false
 	bubble_tail.visible = false
-	pokemon.show_exclaims(0)
+	pseudon.show_exclaims(0)
 	create_tween().tween_property(dim, "modulate:a", 0.0, 0.2)
 	blocker.visible = false
 
@@ -523,13 +523,13 @@ func _refresh() -> void:
 	var genki := "81以上" if sim.genki_mode == Sim.GenkiMode.ALWAYS_HIGH else str(sim.genki_at(sim.elapsed_sec))
 	hud_label.text = "経過 %s ・ げんき %s" % [_format_hours(sim.elapsed_sec), genki]
 
-	pokemon.show_icon = sim.has_icon()
-	pokemon.icon_full = sim.is_full()
+	pseudon.show_icon = sim.has_icon()
+	pseudon.icon_full = sim.is_full()
 
 	var lines: Array[String] = []
 	if last_result.is_empty():
 		lines.append("「すすめる」でおてつだいを進めます。")
-		lines.append("ポケモンのアイコンをタップすると結果が出ます。")
+		lines.append("パチモンのアイコンをタップすると結果が出ます。")
 	else:
 		var r := last_result
 		lines.append("前回%d時間：おてつだい%d回（きのみ%d・食材%d）スキル%d回" % [

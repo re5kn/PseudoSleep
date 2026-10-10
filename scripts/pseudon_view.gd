@@ -1,5 +1,5 @@
 extends Node2D
-## ポケモンの代わりの図形。所持数があれば頭上にアイコン、スキル発動時は「！」を出す。
+## パチモンの代わりの図形。所持数があれば頭上にアイコン、スキル発動時は「！」を出す。
 
 const ItemArt = preload("res://scripts/item_art.gd")
 const FONT = preload("res://fonts/MPLUSRounded1c-Bold.ttf")

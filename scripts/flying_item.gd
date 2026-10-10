@@ -1,5 +1,5 @@
 extends Node2D
-## ポケモンから山へ飛んでいく途中のきのみ・食材。
+## パチモンから山へ飛んでいく途中のきのみ・食材。
 
 const ItemArt = preload("res://scripts/item_art.gd")
 
