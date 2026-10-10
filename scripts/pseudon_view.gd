@@ -46,7 +46,7 @@ func _float_y() -> float:
 
 
 func _draw() -> void:
-	# ふわふわ浮いて、影は浮き上がるほど小さくなる。頭上のアイコンと「!」も体と一緒に動かし、間隔を一定に保つ
+	# ふわふわ浮いて、影は浮き上がるほど小さくなる。頭上のアイコンも体と一緒に動かし、間隔を一定に保つ
 	var float_y := _float_y()
 	var shadow_s := 1.0 - float_y / 60.0
 	draw_colored_polygon(ItemArt.ellipse(Vector2(0, BODY_RY + 8), BODY_RX * 0.8 * shadow_s, 12 * shadow_s), Color(0, 0, 0, 0.22))
@@ -56,7 +56,7 @@ func _draw() -> void:
 	if show_icon:
 		_draw_icon(-float_y)
 	if exclaim_count > 0:
-		_draw_exclaims(-float_y)
+		_draw_exclaims()
 
 
 func _draw_body() -> void:
@@ -79,11 +79,11 @@ func _draw_icon(bob: float) -> void:
 		draw_string(FONT, pos, "MAX", HORIZONTAL_ALIGNMENT_CENTER, 80, 18, border)
 
 
-func _draw_exclaims(bob: float) -> void:
+func _draw_exclaims() -> void:
 	# ストック2回分なら1つの吹き出しに「!!」を並べる
 	var text := "!".repeat(exclaim_count)
 	var stretch := 1.0 + 0.3 * (exclaim_count - 1)
-	draw_set_transform(Vector2(0, ICON_POS.y + bob), 0.0, Vector2.ONE * exclaim_anim)
+	draw_set_transform(Vector2(0, ICON_POS.y), 0.0, Vector2.ONE * exclaim_anim)
 	var burst := PackedVector2Array()
 	for k in 16:
 		var r := 30.0 if k % 2 == 0 else 21.0
