@@ -55,7 +55,6 @@ var box_popup: PanelContainer
 var box_popup_label: Label
 var box_popup_timer: SceneTreeTimer
 var bubble: PanelContainer
-var bubble_tail: Polygon2D
 var bubble_label: Label
 var blocker: Control
 
@@ -206,11 +205,6 @@ func _build_overlays() -> void:
 	box_popup.add_child(box_popup_label)
 	layer.add_child(box_popup)
 
-	bubble_tail = Polygon2D.new()
-	bubble_tail.polygon = PackedVector2Array([Vector2(330, 1066), Vector2(390, 1066), Vector2(360, 1030)])
-	bubble_tail.color = Color.WHITE
-	bubble_tail.visible = false
-	layer.add_child(bubble_tail)
 	bubble = PanelContainer.new()
 	bubble.theme = ui_theme
 	bubble.visible = false
@@ -492,7 +486,6 @@ func _start_cutin(stock: int) -> void:
 		return
 	bubble_label.text = "メインスキルが発動した！\nストック %d回分\n\n（タップでとじる）" % stock
 	bubble.visible = true
-	bubble_tail.visible = true
 	bubble.scale = Vector2(0.6, 0.6)
 	create_tween().tween_property(bubble, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	cutin_closable = true
@@ -507,7 +500,6 @@ func _end_cutin() -> void:
 	cutin_active = false
 	cutin_closable = false
 	bubble.visible = false
-	bubble_tail.visible = false
 	pseudon.show_exclaims(0)
 	create_tween().tween_property(dim, "modulate:a", 0.0, 0.2)
 	blocker.visible = false
