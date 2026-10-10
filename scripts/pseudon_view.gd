@@ -1,5 +1,5 @@
 extends Node2D
-## パチモンの代わりの図形。所持数があれば頭上にアイコン、スキル発動時は「!」を出す。
+## パチモンの代わりの図形（もやをまとったおばけ）。所持数があれば頭上にアイコン、スキル発動時は「!」を出す。
 
 const ItemArt = preload("res://scripts/item_art.gd")
 const FONT = preload("res://fonts/MPLUSRounded1c-Bold.ttf")
@@ -37,9 +37,11 @@ func hit(p: Vector2) -> bool:
 
 
 func _draw() -> void:
-	var breathe := sin(_t * 2.2) * 0.02
-	draw_colored_polygon(ItemArt.ellipse(Vector2(0, BODY_RY - 4), BODY_RX * 0.95, 15), Color(0, 0, 0, 0.18))
-	draw_set_transform(Vector2(0, BODY_RY * -breathe), 0.0, Vector2(1.0 - breathe, 1.0 + breathe))
+	# ふわふわ浮いて、影は浮き上がるほど小さくなる
+	var float_y := sin(_t * 1.8) * 6.0
+	var shadow_s := 1.0 - float_y / 60.0
+	draw_colored_polygon(ItemArt.ellipse(Vector2(0, BODY_RY + 8), BODY_RX * 0.8 * shadow_s, 12 * shadow_s), Color(0, 0, 0, 0.22))
+	draw_set_transform(Vector2(0, -float_y), 0.0, Vector2.ONE)
 	_draw_body()
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	if show_icon:
@@ -49,26 +51,71 @@ func _draw() -> void:
 
 
 func _draw_body() -> void:
-	var line := Color("8a5a2b")
+	# まわりのもや（外側ほど薄く、輪郭がゆらゆら波打つ）
+	for layer in 3:
+		var reach := 20.0 - layer * 7.0
+		var alpha := 0.18 + layer * 0.12
+		draw_colored_polygon(_wisp(reach, layer * 1.7), Color(0.55, 0.32, 0.78, alpha))
+	var body := ItemArt.ellipse(Vector2.ZERO, BODY_RX, BODY_RY, 48)
+	draw_colored_polygon(body, Color("3b2156"))
+	draw_colored_polygon(ItemArt.ellipse(Vector2(-14, -18), 36, 28, 32), Color("4c2d6c"))
+	draw_circle(Vector2(-30, -30), 7, Color(1, 1, 1, 0.12))
+	# 小さなおばけの手
 	for side in [-1.0, 1.0]:
-		var ear := PackedVector2Array([
-			Vector2(side * 22, -46), Vector2(side * 50, -78), Vector2(side * 52, -30),
-		])
-		draw_colored_polygon(ear, Color("f6b75a"))
-		ItemArt.outline(self, ear, line, 3.0)
+		var wave := sin(_t * 2.6 + side) * 5.0
+		var hand := Vector2(side * (BODY_RX + 16), 6 + wave)
+		draw_circle(hand, 13, Color("3b2156"))
+		# 指は上から外側へ扇形に3本
+		for k in 3:
+			var a: float = -PI / 2 + side * (0.35 + k * 0.5)
+			var tip := hand + Vector2(cos(a), sin(a)) * 17
+			draw_line(hand, tip, Color("3b2156"), 9.0, true)
+			draw_circle(tip, 4.5, Color("3b2156"))
+	_draw_face()
+
+
+## もやの輪郭。体のまわりに reach ぶん広がり、時間でうねる。
+func _wisp(reach: float, phase: float) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	var n := 56
+	for i in n:
+		var a := TAU * i / n
+		var wobble := sin(a * 7.0 + _t * 2.0 + phase) * 0.5 + sin(a * 4.0 - _t * 1.3 + phase) * 0.5
+		var r := reach * (0.75 + 0.35 * wobble)
+		pts.append(Vector2(cos(a) * (BODY_RX + r), sin(a) * (BODY_RY + r)))
+	return pts
+
+
+func _draw_face() -> void:
+	var white := Color("fbf6ff")
+	var dark := Color("1a0d29")
+	for side in [-1.0, 1.0]:
+		# 上辺が外側に向かって上がる、つり目の形
+		var top_inner := Vector2(side * 6, -14)
+		var top_outer := Vector2(side * 40, -30)
+		var eye := PackedVector2Array([top_inner, top_outer])
+		for i in range(1, 12):
+			var t := i / 12.0
+			var base := top_outer.lerp(top_inner, t)
+			eye.append(base + Vector2(0, sin(PI * t) * 15))
+		draw_colored_polygon(eye, white)
+		var look := Vector2(sin(_t * 0.7) * 3.0, 0)
+		draw_circle(Vector2(side * 24, -15) + look, 5, dark)
+	# にやっと笑う大きな口
+	var mouth := PackedVector2Array()
+	for i in 17:
+		var t := i / 16.0
+		mouth.append(Vector2(lerp(-38.0, 38.0, t), 6 - sin(PI * t) * 4 + pow(t - 0.5, 2) * -20))
+	for i in 17:
+		var t := 1.0 - i / 16.0
+		mouth.append(Vector2(lerp(-38.0, 38.0, t), 6 + sin(PI * t) * 30))
+	draw_colored_polygon(mouth, Color("7a1d3b"))
+	draw_colored_polygon(ItemArt.ellipse(Vector2(0, 26), 16, 7, 20), Color("e0577a"))
+	for side in [-1.0, 1.0]:
 		draw_colored_polygon(PackedVector2Array([
-			Vector2(side * 32, -46), Vector2(side * 47, -66), Vector2(side * 47, -40),
-		]), Color("fde3a7"))
-	var body := ItemArt.ellipse(Vector2.ZERO, BODY_RX, BODY_RY, 40)
-	draw_colored_polygon(body, Color("f9c46b"))
-	draw_colored_polygon(ItemArt.ellipse(Vector2(0, 16), 38, 32, 32), Color("fff1cc"))
-	ItemArt.outline(self, body, line, 3.0)
-	# 寝顔
-	draw_arc(Vector2(-20, -10), 8, 0.2, PI - 0.2, 10, line, 3.0, true)
-	draw_arc(Vector2(20, -10), 8, 0.2, PI - 0.2, 10, line, 3.0, true)
-	draw_circle(Vector2(-36, 4), 7, Color(1.0, 0.55, 0.55, 0.45))
-	draw_circle(Vector2(36, 4), 7, Color(1.0, 0.55, 0.55, 0.45))
-	draw_arc(Vector2(0, 4), 5, 0.3, PI - 0.3, 8, line, 2.5, true)
+			Vector2(side * 12, 4), Vector2(side * 22, 3), Vector2(side * 17, 14),
+		]), white)
+	ItemArt.outline(self, mouth, dark, 2.0)
 
 
 func _draw_icon(bob: float) -> void:
