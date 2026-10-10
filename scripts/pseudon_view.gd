@@ -1,5 +1,5 @@
 extends Node2D
-## パチモンの代わりの図形。所持数があれば頭上にアイコン、スキル発動時は「！」を出す。
+## パチモンの代わりの図形。所持数があれば頭上にアイコン、スキル発動時は「!」を出す。
 
 const ItemArt = preload("res://scripts/item_art.gd")
 const FONT = preload("res://fonts/MPLUSRounded1c-Bold.ttf")
@@ -87,9 +87,9 @@ func _draw_icon(bob: float) -> void:
 
 
 func _draw_exclaims() -> void:
-	# ストック2回分なら1つの吹き出しに「！！」を並べる
-	var text := "！".repeat(exclaim_count)
-	var stretch := 1.0 + 0.6 * (exclaim_count - 1)
+	# ストック2回分なら1つの吹き出しに「!!」を並べる
+	var text := "!".repeat(exclaim_count)
+	var stretch := 1.0 + 0.3 * (exclaim_count - 1)
 	draw_set_transform(Vector2(0, ICON_POS.y), 0.0, Vector2.ONE * exclaim_anim)
 	var burst := PackedVector2Array()
 	for k in 16:
