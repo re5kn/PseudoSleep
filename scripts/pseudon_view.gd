@@ -1,11 +1,15 @@
 extends Node2D
-## パチモンの代わりの図形（もやをまとったおばけ）。所持数があれば頭上にアイコン、スキル発動時は「!」を出す。
+## パチモンの見た目（images/pseudon.png のおばけ）。所持数があれば頭上にアイコン、スキル発動時は「!」を出す。
 
 const ItemArt = preload("res://scripts/item_art.gd")
 const FONT = preload("res://fonts/MPLUSRounded1c-Bold.ttf")
+const TEXTURE = preload("res://images/pseudon.png")
 
 const BODY_RX := 62.0
 const BODY_RY := 56.0
+## 画像は高さ SPRITE_HEIGHT で、体の中心より少し上に置く
+const SPRITE_HEIGHT := 190.0
+const SPRITE_CENTER := Vector2(0, -8)
 const ICON_POS := Vector2(0, -112)
 const ICON_RADIUS := 27.0
 
@@ -51,71 +55,8 @@ func _draw() -> void:
 
 
 func _draw_body() -> void:
-	# まわりのもや（外側ほど薄く、輪郭がゆらゆら波打つ）
-	for layer in 3:
-		var reach := 20.0 - layer * 7.0
-		var alpha := 0.18 + layer * 0.12
-		draw_colored_polygon(_wisp(reach, layer * 1.7), Color(0.55, 0.32, 0.78, alpha))
-	var body := ItemArt.ellipse(Vector2.ZERO, BODY_RX, BODY_RY, 48)
-	draw_colored_polygon(body, Color("3b2156"))
-	draw_colored_polygon(ItemArt.ellipse(Vector2(-14, -18), 36, 28, 32), Color("4c2d6c"))
-	draw_circle(Vector2(-30, -30), 7, Color(1, 1, 1, 0.12))
-	# 小さなおばけの手
-	for side in [-1.0, 1.0]:
-		var wave := sin(_t * 2.6 + side) * 5.0
-		var hand := Vector2(side * (BODY_RX + 16), 6 + wave)
-		draw_circle(hand, 13, Color("3b2156"))
-		# 指は上から外側へ扇形に3本
-		for k in 3:
-			var a: float = -PI / 2 + side * (0.35 + k * 0.5)
-			var tip := hand + Vector2(cos(a), sin(a)) * 17
-			draw_line(hand, tip, Color("3b2156"), 9.0, true)
-			draw_circle(tip, 4.5, Color("3b2156"))
-	_draw_face()
-
-
-## もやの輪郭。体のまわりに reach ぶん広がり、時間でうねる。
-func _wisp(reach: float, phase: float) -> PackedVector2Array:
-	var pts := PackedVector2Array()
-	var n := 56
-	for i in n:
-		var a := TAU * i / n
-		var wobble := sin(a * 7.0 + _t * 2.0 + phase) * 0.5 + sin(a * 4.0 - _t * 1.3 + phase) * 0.5
-		var r := reach * (0.75 + 0.35 * wobble)
-		pts.append(Vector2(cos(a) * (BODY_RX + r), sin(a) * (BODY_RY + r)))
-	return pts
-
-
-func _draw_face() -> void:
-	var white := Color("fbf6ff")
-	var dark := Color("1a0d29")
-	for side in [-1.0, 1.0]:
-		# 上辺が外側に向かって上がる、つり目の形
-		var top_inner := Vector2(side * 6, -14)
-		var top_outer := Vector2(side * 40, -30)
-		var eye := PackedVector2Array([top_inner, top_outer])
-		for i in range(1, 12):
-			var t := i / 12.0
-			var base := top_outer.lerp(top_inner, t)
-			eye.append(base + Vector2(0, sin(PI * t) * 15))
-		draw_colored_polygon(eye, white)
-		var look := Vector2(sin(_t * 0.7) * 3.0, 0)
-		draw_circle(Vector2(side * 24, -15) + look, 5, dark)
-	# にやっと笑う大きな口
-	var mouth := PackedVector2Array()
-	for i in 17:
-		var t := i / 16.0
-		mouth.append(Vector2(lerp(-38.0, 38.0, t), 6 - sin(PI * t) * 4 + pow(t - 0.5, 2) * -20))
-	for i in 17:
-		var t := 1.0 - i / 16.0
-		mouth.append(Vector2(lerp(-38.0, 38.0, t), 6 + sin(PI * t) * 30))
-	draw_colored_polygon(mouth, Color("7a1d3b"))
-	draw_colored_polygon(ItemArt.ellipse(Vector2(0, 26), 16, 7, 20), Color("e0577a"))
-	for side in [-1.0, 1.0]:
-		draw_colored_polygon(PackedVector2Array([
-			Vector2(side * 12, 4), Vector2(side * 22, 3), Vector2(side * 17, 14),
-		]), white)
-	ItemArt.outline(self, mouth, dark, 2.0)
+	var size := Vector2(TEXTURE.get_width(), TEXTURE.get_height()) * (SPRITE_HEIGHT / TEXTURE.get_height())
+	draw_texture_rect(TEXTURE, Rect2(SPRITE_CENTER - size / 2, size), false)
 
 
 func _draw_icon(bob: float) -> void:
