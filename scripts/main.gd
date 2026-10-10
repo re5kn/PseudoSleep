@@ -21,6 +21,8 @@ const MIN_HOURS := 1
 const MAX_HOURS := 24
 const TOAST_SEC := 2.5
 const CUTIN_PAUSE_SEC := 0.9
+const REPEAT_DELAY_SEC := 0.4
+const REPEAT_INTERVAL_SEC := 0.08
 
 const TEXT_DARK := Color("5a4632")
 const CREAM := Color("fff7e6")
@@ -140,7 +142,7 @@ func _build_panel() -> void:
 	v.add_child(row1)
 	var minus := _button("－", Color("ffe9bf"), TEXT_DARK)
 	minus.custom_minimum_size = Vector2(56, 56)
-	minus.pressed.connect(_change_hours.bind(-1))
+	_add_hold_repeat(minus, _change_hours.bind(-1))
 	row1.add_child(minus)
 	hours_label = _label("", 24)
 	hours_label.custom_minimum_size = Vector2(92, 0)
@@ -148,7 +150,7 @@ func _build_panel() -> void:
 	row1.add_child(hours_label)
 	var plus := _button("＋", Color("ffe9bf"), TEXT_DARK)
 	plus.custom_minimum_size = Vector2(56, 56)
-	plus.pressed.connect(_change_hours.bind(1))
+	_add_hold_repeat(plus, _change_hours.bind(1))
 	row1.add_child(plus)
 	advance_button = _button("", Color("4fbf6a"), Color.WHITE)
 	advance_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -268,6 +270,19 @@ func _button(text: String, color: Color, text_color: Color) -> Button:
 	b.text = text
 	_apply_button_styles(b, color, text_color)
 	return b
+
+
+# 押した瞬間に1回反応し、押しっぱなしならしばらく待ってから連続で反応させる
+func _add_hold_repeat(b: Button, action: Callable) -> void:
+	var timer := Timer.new()
+	b.add_child(timer)
+	timer.timeout.connect(func() -> void:
+		timer.start(REPEAT_INTERVAL_SEC)
+		action.call())
+	b.button_down.connect(func() -> void:
+		action.call()
+		timer.start(REPEAT_DELAY_SEC))
+	b.button_up.connect(timer.stop)
 
 
 func _toggle() -> Button:
