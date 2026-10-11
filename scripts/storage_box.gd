@@ -1,12 +1,9 @@
 extends Node2D
-## きのみ収容箱・食材収容箱の見た目。
+## きのみ・食材収容箱の見た目（きのみ収容箱の木箱を踏襲）。
 
 const ItemArt = preload("res://scripts/item_art.gd")
 const FONT = preload("res://fonts/MPLUSRounded1c-Bold.ttf")
 
-enum Kind { BERRY, INGREDIENT }
-
-var kind: int = Kind.BERRY
 var label := ""
 var _t := 0.0
 
@@ -26,10 +23,7 @@ func hit(p: Vector2) -> bool:
 
 func _draw() -> void:
 	draw_colored_polygon(ItemArt.ellipse(Vector2(0, 38), 62, 12), Color(0, 0, 0, 0.16))
-	if kind == Kind.BERRY:
-		_draw_crate()
-	else:
-		_draw_cooler()
+	_draw_crate()
 	ItemArt.name_tag(self, TAG_POS + Vector2(0, sin(_t * 3.0) * 4.0), label, FONT)
 
 
@@ -53,15 +47,3 @@ func _draw_crate() -> void:
 	draw_rect(Rect2(-14, -6, 28, 12), Color("c9a063"))
 	ItemArt.outline(self, body, line, 2.5)
 
-
-func _draw_cooler() -> void:
-	var line := Color("3f6f99")
-	var body := PackedVector2Array([Vector2(-50, -14), Vector2(50, -14), Vector2(46, 38), Vector2(-46, 38)])
-	draw_colored_polygon(body, Color("63aee8"))
-	draw_rect(Rect2(-46, 10, 92, 6), Color("4f95cf"))
-	ItemArt.outline(self, body, line, 2.5)
-	var lid := PackedVector2Array([Vector2(-54, -32), Vector2(54, -32), Vector2(52, -12), Vector2(-52, -12)])
-	draw_colored_polygon(lid, Color("f4f8fc"))
-	ItemArt.outline(self, lid, line, 2.5)
-	draw_arc(Vector2(0, -32), 22, PI, TAU, 16, Color("d1d9e2"), 6.0, true)
-	draw_rect(Rect2(-12, -4, 24, 8), Color("f4f8fc"))
