@@ -14,6 +14,9 @@ const SPRITE_CENTER := Vector2(0, -8)
 ## 頭上の印（アイコン・「…」・「!」）は画像の上端（-103）よりしっぽ込みで上に出す
 const ICON_POS := Vector2(0, -152)
 const ICON_RADIUS := 27.0
+## 手のひらのあたり（画面から見て左がパチモンの右手）。きのみは右手、食材は左手から出す
+const RIGHT_HAND := Vector2(-60, 2)
+const LEFT_HAND := Vector2(58, 6)
 
 var show_icon := false
 ## 設定パネルを開ける印（「…」の吹き出し）を出すか
@@ -42,6 +45,12 @@ func hit(p: Vector2) -> bool:
 	var body := Vector2(local.x / (BODY_RX + 12), local.y / (BODY_RY + 12)).length() <= 1.0
 	var icon := (show_icon or show_menu) and local.distance_to(ICON_POS + Vector2(0, -_float_y())) <= ICON_RADIUS + 12
 	return body or icon
+
+
+## アイテムを出す手の位置（親ノードの座標。浮き上がりに合わせて動く）
+func hand_position(id: String) -> Vector2:
+	var hand := RIGHT_HAND if id == "berry" else LEFT_HAND
+	return position + hand + Vector2(0, -_float_y())
 
 
 ## 体が浮き上がっている量（上向きが正）
