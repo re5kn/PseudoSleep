@@ -48,7 +48,7 @@ func _draw() -> void:
 		_draw_tuft(t)
 	for f in _flowers:
 		_draw_flower(f[0], f[1])
-	_draw_bed(Vector2(455, 360))
+	_draw_bed(Vector2(478, 352))
 
 
 func _draw_sea() -> void:
@@ -119,40 +119,61 @@ func _draw_flower(p: Vector2, col: Color) -> void:
 
 
 func _draw_bed(p: Vector2) -> void:
+	# 左下が足元、右上が枕の斜め向き。L=長さ方向、W=幅方向、H=厚み
+	var L := Vector2(110, -45)
+	var W := Vector2(40, 17)
+	var H := Vector2(0, 16)
+	var a := p - L / 2 - W / 2
+	var b := a + W
+	var c := b + L
+	var d := a + L
 	var line := Color("a8794a")
-	draw_colored_polygon(ItemArt.ellipse(p + Vector2(0, 40), 68, 10), Color(0, 0, 0, 0.12))
-	for x in [-50.0, 44.0]:
-		draw_rect(Rect2(p + Vector2(x, 26), Vector2(6, 14)), Color("b38a55"))
+	var shadow := PackedVector2Array([a + H * 2.6 + Vector2(-6, 0), b + H * 2.6 + Vector2(0, 6), c + H * 2.6 + Vector2(8, 4), d + H * 2.6 + Vector2(6, -4)])
+	draw_colored_polygon(shadow, Color(0, 0, 0, 0.12))
+	for q in [a, b, c]:
+		draw_rect(Rect2(q + H + Vector2(-3, -2), Vector2(6, 13)), Color("b38a55"))
 	# ヘッドボード（上が丸い板）
-	var head := PackedVector2Array([p + Vector2(-56, -14), p + Vector2(-56, -36)])
-	for i in range(1, 13):
-		var a := PI + PI * i / 12.0
-		head.append(p + Vector2(0, -36) + Vector2(cos(a) * 56, sin(a) * 18))
-	head.append(p + Vector2(56, -14))
+	var head := PackedVector2Array([c + H * 1.6, d + H * 1.6])
+	for i in 13:
+		var t := i / 12.0
+		head.append(d.lerp(c, t) + Vector2(0, -22 - 16 * sin(t * PI)))
+	var thick := L.normalized() * 5
+	var head_back := PackedVector2Array()
+	for v in head:
+		head_back.append(v + thick)
+	draw_colored_polygon(head_back, Color("c98f52"))
 	draw_colored_polygon(head, Color("e8b878"))
 	ItemArt.outline(self, head, line, 2.0)
-	draw_colored_polygon(ItemArt.ellipse(p + Vector2(0, -38), 30, 7, 20), Color("f3cf96"))
-	# 側板
-	var frame := PackedVector2Array([p + Vector2(-60, 12), p + Vector2(60, 12), p + Vector2(60, 30), p + Vector2(-60, 30)])
-	draw_colored_polygon(frame, Color("d9a86c"))
-	ItemArt.outline(self, frame, line, 2.0)
-	# マットレス
-	var mattress := PackedVector2Array([p + Vector2(-52, -22), p + Vector2(52, -22), p + Vector2(58, 12), p + Vector2(-58, 12)])
-	draw_colored_polygon(mattress, Color("fffaf0"))
-	ItemArt.outline(self, mattress, Color("d8ccb4"), 1.5)
+	# マットレス（上面・手前の側面・足元の面）
+	var top := PackedVector2Array([a, b, c, d])
+	var side := PackedVector2Array([b, c, c + H, b + H])
+	var foot := PackedVector2Array([a, b, b + H, a + H])
+	draw_colored_polygon(side, Color("efe6d2"))
+	draw_colored_polygon(foot, Color("e6dcc6"))
+	draw_colored_polygon(top, Color("fffaf0"))
 	# まくら
-	var pillow := ItemArt.ellipse(p + Vector2(0, -15), 28, 7, 20)
+	var pc := a + L * 0.84 + W * 0.5 + Vector2(0, -3)
+	var pillow := PackedVector2Array()
+	for i in 20:
+		var ang := TAU * i / 20.0
+		pillow.append(pc + W.normalized() * cos(ang) * 17 + L.normalized() * sin(ang) * 8)
 	draw_colored_polygon(pillow, Color("ffffff"))
 	ItemArt.outline(self, pillow, Color("d8ccb4"), 1.5)
-	# 掛け布団（手前に垂れる）
-	var blanket := PackedVector2Array([
-		p + Vector2(-55, -4), p + Vector2(55, -4), p + Vector2(59, 12), p + Vector2(59, 24),
-		p + Vector2(30, 27), p + Vector2(0, 25), p + Vector2(-30, 27), p + Vector2(-59, 24), p + Vector2(-59, 12),
-	])
-	draw_colored_polygon(blanket, Color("f7a8c4"))
-	draw_colored_polygon(PackedVector2Array([
-		p + Vector2(-55, -4), p + Vector2(55, -4), p + Vector2(56, 2), p + Vector2(-56, 2),
-	]), Color("fcd3e1"))
-	ItemArt.outline(self, blanket, Color("d97a9e"), 1.5)
-	for d in [Vector2(-38, 8), Vector2(-12, 16), Vector2(14, 7), Vector2(40, 17), Vector2(-44, 20), Vector2(26, 21)]:
-		draw_circle(p + d, 2.5, Color(1, 1, 1, 0.8))
+	# 掛け布団（足元側を覆い、手前と足元に垂れる）
+	var k := 0.62
+	var bl_top := PackedVector2Array([a, b, b + L * k, a + L * k])
+	var bl_side := PackedVector2Array([b, b + L * k, b + L * k + H * 1.25, b + H * 1.25])
+	var bl_foot := PackedVector2Array([a, b, b + H * 1.25, a + H * 1.25])
+	draw_colored_polygon(bl_side, Color("ee93b5"))
+	draw_colored_polygon(bl_foot, Color("e486aa"))
+	draw_colored_polygon(bl_top, Color("f7a8c4"))
+	draw_colored_polygon(PackedVector2Array([a + L * (k - 0.1), b + L * (k - 0.1), b + L * k, a + L * k]), Color("fcd3e1"))
+	for uv in [Vector2(0.12, 0.3), Vector2(0.22, 0.75), Vector2(0.36, 0.4), Vector2(0.46, 0.8)]:
+		draw_circle(a + L * uv.x + W * uv.y, 2.5, Color(1, 1, 1, 0.8))
+	for uv in [Vector2(0.15, 0.55), Vector2(0.4, 0.5)]:
+		draw_circle(b + L * uv.x + H * uv.y, 2.5, Color(1, 1, 1, 0.8))
+	ItemArt.outline(self, PackedVector2Array([a, b, b + H * 1.25, a + H * 1.25]), Color("d97a9e"), 1.5)
+	ItemArt.outline(self, PackedVector2Array([b, b + L * k, b + L * k + H * 1.25, b + H * 1.25]), Color("d97a9e"), 1.5)
+	ItemArt.outline(self, PackedVector2Array([a, b, b + L * k, a + L * k]), Color("d97a9e"), 1.5)
+	ItemArt.outline(self, PackedVector2Array([b + L * k, c, d, a + L * k]), Color("d8ccb4"), 1.5)
+	ItemArt.outline(self, PackedVector2Array([b + L * k + H * 1.25, b + L * k, c, c + H]), Color("d8ccb4"), 1.5)
