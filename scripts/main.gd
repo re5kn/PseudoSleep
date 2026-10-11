@@ -663,14 +663,18 @@ func _launch(id: String, amount: int, pile: ItemPile, delay: float, k: int) -> v
 	var fly := FlyingItem.new()
 	fly.item_id = id
 	fly.visible = false
-	var from := PSEUDON_POS + Vector2(0, 10)
 	var to := pile.position + Vector2((k % 3 - 1) * 10, -8)
-	fly.position = from
 	actor_root.add_child(fly)
 	var tw := fly.create_tween()
 	tw.tween_interval(delay)
-	tw.tween_callback(func(): fly.visible = true)
-	tw.tween_method(func(t: float): fly.position = _arc(from, to, t), 0.0, 1.0, 0.42)
+	# 出す瞬間の手の位置から飛ばす（体はふわふわ動いている）
+	var from := {"pos": Vector2.ZERO}
+	tw.tween_callback(func():
+		from["pos"] = pseudon.hand_position(id)
+		fly.position = from["pos"]
+		fly.visible = true
+	)
+	tw.tween_method(func(t: float): fly.position = _arc(from["pos"], to, t), 0.0, 1.0, 0.42)
 	tw.tween_callback(func():
 		var on_field := int(sim.on_field.get(id, 0))
 		pile.set_count(mini(pile.count + amount, on_field))
