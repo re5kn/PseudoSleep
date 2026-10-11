@@ -16,6 +16,8 @@ func _init() -> void:
 	_test_modifiers()
 	_test_slots_by_level()
 	_test_subskill_slots()
+	_test_skill_ceiling()
+	_test_skill_ceiling_stock2()
 	_test_example1_help_count()
 	_test_example2_help_count()
 	_test_carry_over()
@@ -46,6 +48,7 @@ func _example_params() -> Params:
 	p.level = 1
 	p.ingredient_prob = 0.25
 	p.skill_prob = 0.05
+	p.skill_ceiling = 78
 	p.max_carry = 25
 	p.berries_per_help = 2
 	p.max_skill_stock = 1
@@ -80,7 +83,7 @@ func _test_default_params() -> void:
 	check(p.help_sec() == 1940.0, "2200秒×0.882=1940.4は1940秒 (got %f)" % p.help_sec())
 	check(p.carry_limit() == 22, "最大所持数22")
 	check(p.max_skill_stock == 2, "スキルストック上限2")
-	check(p.skill_ceiling == 65, "スキル発生天井65（入力値のみ。計算には未使用）")
+	check(p.skill_ceiling == 65, "スキル発生天井65")
 	check(_near(p.ingredient_chance(), 0.151, 1e-9) and _near(p.skill_chance(), 0.039, 1e-9), "食材確率15.1%・スキル確率3.9%")
 	check(p.berry_amount() == 1, "きのみ1個")
 	var amounts := []
@@ -183,6 +186,58 @@ func _test_subskill_slots() -> void:
 	p.level = 80
 	p.trim_subskills()
 	check(p.subskills.size() == 3, "レベルを上げても自動では付かない")
+
+
+func _test_skill_ceiling() -> void:
+	print("スキル発生の天井")
+	var p := Params.new()
+	p.max_carry = 1000000
+	p.skill_prob = 0.0
+	p.skill_ceiling = 5
+	p.max_skill_stock = 1
+	var s := Sim.new(p)
+	var r := s.advance(p.help_sec() * 0.45 * 5 + 1)
+	check(r["helps"] == 5 and r["skills"] == 0 and s.skill_miss == 5, "5回続けて不発 (helps %d, skills %d)" % [r["helps"], r["skills"]])
+	r = s.advance(p.help_sec() * 0.45)
+	check(r["skills"] == 1 and r["skill_ceiling_hits"] == 1, "天井5なら6回目で必ず発動")
+	check(s.ceiling_stock == 1, "天井で出たストックを覚えている")
+	r = s.advance(p.help_sec() * 0.45 * 20)
+	check(r["skills"] == 0 and s.skill_miss == 0, "ストックが上限のあいだは抽選せず、不発カウントも0のまま")
+	var d := s.drop()
+	check(d["ceiling"] == 1 and s.ceiling_stock == 0, "タップで天井分を知らせて消費")
+	r = s.advance(p.help_sec() * 0.45 * 5)
+	check(r["skills"] == 0, "タップ後も5回目までは発動しない (got %d)" % r["skills"])
+	r = s.advance(p.help_sec() * 0.45)
+	check(r["skills"] == 1, "タップ後はまた6回目で発動 (got %d)" % r["skills"])
+
+
+## ストック2: 1回目は天井で発動、そのあと不発カウントは0から数え直し、2回目は天井に届く前に通常の抽選で発動する
+func _test_skill_ceiling_stock2() -> void:
+	print("スキル天井 ストック2（1回目が天井、2回目は天井前）")
+	var p := Params.new()
+	p.max_carry = 1000000
+	p.skill_prob = 0.0
+	p.skill_ceiling = 5
+	p.max_skill_stock = 2
+	var s := Sim.new(p)
+	var t := p.help_sec() * 0.45
+	var r := s.advance(t * 5 + 1)
+	check(r["skills"] == 0 and s.skill_miss == 5, "5回続けて不発 (miss %d)" % s.skill_miss)
+	r = s.advance(t)
+	check(r["skills"] == 1 and r["skill_ceiling_hits"] == 1, "6回目に天井で1回目が発動")
+	check(s.skill_stock == 1 and s.ceiling_stock == 1, "ストック1、うち天井1")
+	check(s.skill_miss == 0, "天井で発動したら不発カウントは0に戻る (miss %d)" % s.skill_miss)
+	r = s.advance(t * 3)
+	check(r["skills"] == 0 and s.skill_miss == 3, "ストックに空きがあるので抽選が続き、0から数え直して3回不発 (miss %d)" % s.skill_miss)
+	p.skill_prob = 1.0
+	r = s.advance(t)
+	check(r["skills"] == 1 and r["skill_ceiling_hits"] == 0, "2回目は天井に届く前（不発3回の次）に通常の抽選で発動")
+	check(s.skill_stock == 2 and s.ceiling_stock == 1, "ストック2、うち天井は1回目の1つだけ (stock %d, ceiling %d)" % [s.skill_stock, s.ceiling_stock])
+	check(s.skill_miss == 0, "通常の発動でも不発カウントは0に戻る")
+	r = s.advance(t * 10)
+	check(r["skills"] == 0 and s.skill_miss == 0, "ストックが上限になったら抽選せず、不発カウントも増えない")
+	var d := s.drop()
+	check(d["stock"] == 2 and d["ceiling"] == 1, "タップでストック2、うち天井1を知らせる (stock %d, ceiling %d)" % [d["stock"], d["ceiling"]])
 
 
 func _test_example1_help_count() -> void:
