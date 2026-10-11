@@ -24,6 +24,30 @@ static func rounded_rect(c: Vector2, half: Vector2, r: float, n: int = 6) -> Pac
 	return pts
 
 
+## メインスキルの「!」の後ろに出るギザギザ。真上から時計回りに [角度(度), 半径の倍率] を
+## 山・谷の順に並べた固定の表で、トゲ13本・左右非対称・不規則にしてある（毎フレーム同じ形）。
+## 全体は BURST_WIDE 倍の横長。
+const BURST := [
+	[8, 1.12], [18, 0.76], [30, 0.86], [47, 0.72], [61, 1.24], [73, 0.79],
+	[85, 0.92], [99, 0.74], [119, 0.82], [131, 0.77], [139, 1.16], [154, 0.73],
+	[168, 0.96], [180, 0.80], [194, 1.20], [212, 0.72], [227, 0.85], [238, 0.78],
+	[250, 1.08], [268, 0.75], [280, 0.90], [290, 0.73], [305, 1.22], [323, 0.79],
+	[341, 0.94], [356, 0.74],
+]
+const BURST_WIDE := 1.3
+## ギザギザの中の「!」は右に約12度傾ける（ラジアン）
+const EXCLAIM_TILT := 0.21
+
+
+## 中心 c、基準の半径 r のギザギザ。stretch で横に伸ばす（「!!」用）
+static func burst(c: Vector2, r: float, stretch: float = 1.0) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	for p in BURST:
+		var a := deg_to_rad(p[0]) - PI / 2
+		pts.append(c + Vector2(cos(a) * BURST_WIDE * stretch, sin(a)) * r * p[1])
+	return pts
+
+
 static func outline(ci: CanvasItem, pts: PackedVector2Array, color: Color, width: float) -> void:
 	var closed := pts.duplicate()
 	closed.append(pts[0])
