@@ -84,7 +84,7 @@ func _test_default_params() -> void:
 	check(p.help_sec() == 1940.0, "2200秒×0.882=1940.4は1940秒 (got %f)" % p.help_sec())
 	check(p.carry_limit() == 22, "最大所持数22")
 	check(p.max_skill_stock == 2, "スキルストック上限2")
-	check(p.skill_ceiling == 65, "スキル発生天井65")
+	check(p.skill_ceiling == 65, "スキル連続不発上限65")
 	check(_near(p.ingredient_chance(), 0.151, 1e-9) and _near(p.skill_chance(), 0.039, 1e-9), "食材確率15.1%・スキル確率3.9%")
 	check(p.berry_amount() == 1, "きのみ1個")
 	var amounts := []
@@ -190,7 +190,7 @@ func _test_subskill_slots() -> void:
 
 
 func _test_skill_ceiling() -> void:
-	print("スキル発生の天井")
+	print("スキル連続不発上限")
 	var p := Params.new()
 	p.max_carry = 1000000
 	p.skill_prob = 0.0
