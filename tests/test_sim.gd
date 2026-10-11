@@ -195,17 +195,19 @@ func _test_skill_ceiling() -> void:
 	p.skill_ceiling = 5
 	p.max_skill_stock = 1
 	var s := Sim.new(p)
-	var r := s.advance(p.help_sec() * 0.45 * 4 + 1)
-	check(r["helps"] == 4 and r["skills"] == 0, "4回目までは発動しない (helps %d, skills %d)" % [r["helps"], r["skills"]])
+	var r := s.advance(p.help_sec() * 0.45 * 5 + 1)
+	check(r["helps"] == 5 and r["skills"] == 0 and s.skill_miss == 5, "5回続けて不発 (helps %d, skills %d)" % [r["helps"], r["skills"]])
 	r = s.advance(p.help_sec() * 0.45)
-	check(r["skills"] == 1 and r["skill_ceiling_hits"] == 1, "5回目で必ず発動")
+	check(r["skills"] == 1 and r["skill_ceiling_hits"] == 1, "天井5なら6回目で必ず発動")
 	check(s.ceiling_stock == 1, "天井で出たストックを覚えている")
 	r = s.advance(p.help_sec() * 0.45 * 20)
 	check(r["skills"] == 0 and s.skill_miss == 0, "ストックが上限のあいだは抽選せず、不発カウントも0のまま")
 	var d := s.drop()
 	check(d["ceiling"] == 1 and s.ceiling_stock == 0, "タップで天井分を知らせて消費")
 	r = s.advance(p.help_sec() * 0.45 * 5)
-	check(r["skills"] == 1, "タップ後はまた5回目で発動 (got %d)" % r["skills"])
+	check(r["skills"] == 0, "タップ後も5回目までは発動しない (got %d)" % r["skills"])
+	r = s.advance(p.help_sec() * 0.45)
+	check(r["skills"] == 1, "タップ後はまた6回目で発動 (got %d)" % r["skills"])
 
 
 func _test_example1_help_count() -> void:

@@ -6,7 +6,7 @@ extends RefCounted
 ##   おてつだい時間 = 基準時間 × レベル・せいかく・サブスキル・おやすみリボン補正 を小数点以下切り捨て（Params.help_sec）
 ## - 1回のおてつだいで、確率 p で食材（解放済みの枠から等確率）、1−p できのみ
 ## - それとは独立に、確率 q でメインスキルが発動してストックに入る
-##   ストックが上限のあいだは抽選しない。抽選に (天井−1) 回続けて外れると次は必ず発動する
+##   ストックが上限のあいだは抽選しない。抽選に 天井 回続けて外れると次は必ず発動する
 ## - 所持数（パチモンが持っている分＋フィールドに残っている分）が最大所持数に達していると
 ##   「いつのまに育成」になり、きのみはカビゴンへ自動で渡され、食材もスキルも出ない
 ## - 途中まで進んだおてつだいは次の「すすめる」に持ち越す
@@ -142,7 +142,7 @@ func _do_help(r: Dictionary) -> void:
 func _skill_lottery(r: Dictionary) -> void:
 	if skill_stock >= params.max_skill_stock:
 		return
-	var by_ceiling := skill_miss >= params.skill_ceiling - 1
+	var by_ceiling := skill_miss >= params.skill_ceiling
 	if rng.randf() < params.skill_chance() or by_ceiling:
 		r["skills"] += 1
 		if by_ceiling:
