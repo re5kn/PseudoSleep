@@ -33,7 +33,7 @@ func _draw_crate() -> void:
 	ItemArt.outline(self, lid, line, 2.5)
 	# 中のきのみ
 	var fruits := [
-		[Vector2(-28, -22), "berry"], [Vector2(-8, -26), "ing_a"], [Vector2(14, -22), "berry"],
+		[Vector2(-28, -22), "berry"], [Vector2(-8, -26), "berry"], [Vector2(14, -22), "berry"],
 		[Vector2(30, -26), "berry"], [Vector2(0, -16), "berry"],
 	]
 	for f in fruits:
