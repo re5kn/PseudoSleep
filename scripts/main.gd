@@ -303,6 +303,7 @@ func _set_settings_open(open: bool) -> void:
 	if open == settings_open:
 		return
 	settings_open = open
+	_refresh()
 	if not open:
 		# 入力途中の数値を確定させる
 		get_viewport().gui_release_focus()
@@ -660,7 +661,7 @@ func _refresh() -> void:
 		sim.params.pseudon_name, sim.params.level, _format_hours(sim.elapsed_sec), genki]
 
 	pseudon.show_icon = sim.has_icon()
-	pseudon.show_menu = not pseudon.show_icon
+	pseudon.show_menu = not pseudon.show_icon and not settings_open
 	pseudon.icon_full = sim.is_full()
 
 	var lines: Array[String] = []
