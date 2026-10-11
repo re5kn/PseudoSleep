@@ -30,6 +30,8 @@ const SETTINGS_SLIDE_SEC := 0.22
 
 const TEXT_DARK := Color("5a4632")
 const CREAM := Color("fff7e6")
+## 天井で出たスキルの目印の色
+const CEILING_COLOR := Color("e2483d")
 
 var sim: Sim
 var hours := 3
@@ -54,7 +56,7 @@ var hud_label: Label
 var hours_label: Label
 var advance_button: Button
 var genki_button: Button
-var status_label: Label
+var status_label: RichTextLabel
 var toast_box: VBoxContainer
 var box_popup: PanelContainer
 var box_popup_label: Label
@@ -221,8 +223,12 @@ func _build_panel() -> void:
 	reset.pressed.connect(_on_reset)
 	row2.add_child(reset)
 
-	status_label = _label("", 17)
-	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	status_label = RichTextLabel.new()
+	status_label.bbcode_enabled = true
+	status_label.scroll_active = false
+	status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	status_label.add_theme_font_size_override("normal_font_size", 17)
+	status_label.add_theme_color_override("default_color", TEXT_DARK)
 	status_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(status_label)
 
@@ -321,7 +327,7 @@ func _set_settings_slide(t: float) -> void:
 
 
 func _on_params_changed() -> void:
-	sim.skill_stock = mini(sim.skill_stock, sim.params.max_skill_stock)
+	sim.clamp_stock()
 	_refresh()
 
 
@@ -488,7 +494,7 @@ func _on_pseudon_tap() -> void:
 	var stock: int = result["stock"]
 	_spawn_drops(result["items"])
 	if stock > 0:
-		_start_cutin(stock)
+		_start_cutin(stock, result["ceiling"])
 	_refresh()
 
 
@@ -567,7 +573,7 @@ func _arc(from: Vector2, to: Vector2, t: float) -> Vector2:
 
 # ---------------------------------------------------------------- メインスキルのカットイン
 
-func _start_cutin(stock: int) -> void:
+func _start_cutin(stock: int, by_ceiling: int) -> void:
 	cutin_active = true
 	cutin_closable = false
 	_hide_box_popup()
@@ -577,7 +583,10 @@ func _start_cutin(stock: int) -> void:
 	await get_tree().create_timer(CUTIN_PAUSE_SEC).timeout
 	if not cutin_active:
 		return
-	bubble_label.text = "メインスキルが発動した！\nストック %d回分\n\n（タップでとじる）" % stock
+	var ceiling_note := ""
+	if by_ceiling > 0:
+		ceiling_note = "（天井で発動）" if by_ceiling == stock else "（うち天井 %d回分）" % by_ceiling
+	bubble_label.text = "メインスキルが発動した！\nストック %d回分%s\n\n（タップでとじる）" % [stock, ceiling_note]
 	bubble.visible = true
 	bubble.scale = Vector2(0.6, 0.6)
 	create_tween().tween_property(bubble, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -670,8 +679,11 @@ func _refresh() -> void:
 		lines.append("パチモンのアイコンをタップすると結果が出ます。")
 	else:
 		var r := last_result
-		lines.append("前回%d時間：おてつだい%d回（きのみ%d・食材%d）スキル%d回" % [
-			int(r["seconds"] / 3600.0), r["helps"], r["berry_helps"], r["ingredient_helps"], r["skills"]])
+		var ceiling_hits := ""
+		if r["skill_ceiling_hits"] > 0:
+			ceiling_hits = "[color=%s]（うち天井%d回）[/color]" % [CEILING_COLOR.to_html(false), r["skill_ceiling_hits"]]
+		lines.append("前回%d時間：おてつだい%d回（きのみ%d・食材%d）スキル%d回%s" % [
+			int(r["seconds"] / 3600.0), r["helps"], r["berry_helps"], r["ingredient_helps"], r["skills"], ceiling_hits])
 		var parts: Array[String] = []
 		for id in sim.params.item_ids():
 			parts.append("%s %d" % [sim.params.item_name(id), int(r["items"].get(id, 0))])
@@ -679,6 +691,11 @@ func _refresh() -> void:
 		if r["full_helps"] > 0:
 			extra = "　いつのまに育成%d回" % r["full_helps"]
 		lines.append("獲得：" + "・".join(parts) + extra)
-	lines.append("所持 %d/%d　スキルストック %d/%d" % [
-		sim.held_count(), sim.params.carry_limit(), sim.skill_stock, sim.params.max_skill_stock])
+	var stock_note := ""
+	if sim.ceiling_stock > 0:
+		stock_note = " [bgcolor=%s][color=#ffffff] 天井%s [/color][/bgcolor]" % [
+			CEILING_COLOR.to_html(false), "" if sim.ceiling_stock == sim.skill_stock else "×%d" % sim.ceiling_stock]
+	lines.append("所持 %d/%d　スキルストック %d/%d%s　天井まで あと%d回" % [
+		sim.held_count(), sim.params.carry_limit(), sim.skill_stock, sim.params.max_skill_stock, stock_note,
+		maxi(1, sim.params.skill_ceiling + 1 - sim.skill_miss)])
 	status_label.text = "\n".join(lines)
