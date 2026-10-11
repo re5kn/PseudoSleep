@@ -35,7 +35,6 @@ const CEILING_COLOR := Color("e2483d")
 
 var sim: Sim
 var hours := 3
-var last_result := {}
 var piles := {}
 var cutin_active := false
 var cutin_closable := false
@@ -52,7 +51,7 @@ var pseudon: PseudonView
 var berry_box: StorageBox
 var ingredient_box: StorageBox
 var dim: ColorRect
-var hud_label: Label
+var hud_label: RichTextLabel
 var hours_label: Label
 var advance_button: Button
 var genki_button: Button
@@ -150,7 +149,14 @@ func _build_field() -> void:
 	hud.position = Vector2(16, 16)
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud.add_theme_stylebox_override("panel", _style(Color(1, 1, 1, 0.85), 20, 8))
-	hud_label = _label("", 20)
+	hud_label = RichTextLabel.new()
+	hud_label.bbcode_enabled = true
+	hud_label.fit_content = true
+	hud_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	hud_label.scroll_active = false
+	hud_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hud_label.add_theme_font_size_override("normal_font_size", 20)
+	hud_label.add_theme_color_override("default_color", TEXT_DARK)
 	hud.add_child(hud_label)
 	field.add_child(hud)
 
@@ -400,7 +406,7 @@ func _on_advance() -> void:
 	if cutin_active:
 		return
 	_hide_box_popup()
-	last_result = sim.advance(hours * 3600.0)
+	sim.advance(hours * 3600.0)
 	_refresh()
 
 
@@ -414,7 +420,6 @@ func _on_reset() -> void:
 	if cutin_active:
 		return
 	sim.reset()
-	last_result = {}
 	for id in piles:
 		piles[id].queue_free()
 	piles.clear()
@@ -666,31 +671,23 @@ func _refresh() -> void:
 	advance_button.text = "%d時間分すすめる" % hours
 	genki_button.text = "げんき：81以上で固定" if sim.genki_mode == Sim.GenkiMode.ALWAYS_HIGH else "げんき：100から減少"
 	var genki := "81以上" if sim.genki_mode == Sim.GenkiMode.ALWAYS_HIGH else str(sim.genki_at(sim.elapsed_sec))
-	hud_label.text = "%s（Lv.%d）\n経過 %s ・ げんき %s" % [
-		sim.params.pseudon_name, sim.params.level, _format_hours(sim.elapsed_sec), genki]
+	# おてつだいの累計（リセットで 0 に戻る）
+	var t := sim.totals
+	var ceiling_hits := "うち天井%d回" % t["skill_ceiling_hits"]
+	if t["skill_ceiling_hits"] > 0:
+		ceiling_hits = "[color=%s]%s[/color]" % [CEILING_COLOR.to_html(false), ceiling_hits]
+	hud_label.text = "%s（Lv.%d）\n経過 %s ・ げんき %s\nおてつだい回数：%d回\nきのみ回数：%d回\n食材回数：%d回\nスキル回数：%d回（%s）" % [
+		sim.params.pseudon_name, sim.params.level, _format_hours(sim.elapsed_sec), genki,
+		t["helps"], t["berry_helps"], t["ingredient_helps"], t["skills"], ceiling_hits]
 
 	pseudon.show_icon = sim.has_icon()
 	pseudon.show_menu = not pseudon.show_icon and not settings_open
 	pseudon.icon_full = sim.is_full()
 
 	var lines: Array[String] = []
-	if last_result.is_empty():
+	if sim.elapsed_sec == 0.0:
 		lines.append("「すすめる」でおてつだいを進めます。")
 		lines.append("パチモンのアイコンをタップすると結果が出ます。")
-	else:
-		var r := last_result
-		var ceiling_hits := ""
-		if r["skill_ceiling_hits"] > 0:
-			ceiling_hits = "[color=%s]（うち天井%d回）[/color]" % [CEILING_COLOR.to_html(false), r["skill_ceiling_hits"]]
-		lines.append("前回%d時間：おてつだい%d回（きのみ%d・食材%d）スキル%d回%s" % [
-			int(r["seconds"] / 3600.0), r["helps"], r["berry_helps"], r["ingredient_helps"], r["skills"], ceiling_hits])
-		var parts: Array[String] = []
-		for id in sim.params.item_ids():
-			parts.append("%s %d" % [sim.params.item_name(id), int(r["items"].get(id, 0))])
-		var extra := ""
-		if r["full_helps"] > 0:
-			extra = "　いつのまに育成%d回" % r["full_helps"]
-		lines.append("獲得：" + "・".join(parts) + extra)
 	var stock_note := ""
 	if sim.ceiling_stock > 0:
 		stock_note = " [bgcolor=%s][color=#ffffff] 天井%s [/color][/bgcolor]" % [
