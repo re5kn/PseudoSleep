@@ -11,6 +11,7 @@ const ItemIcon = preload("res://scripts/item_icon.gd")
 const SettingsPanel = preload("res://scripts/settings_panel.gd")
 const HelpLogTable = preload("res://scripts/help_log_table.gd")
 const Desk = preload("res://scripts/desk.gd")
+const FieldClock = preload("res://scripts/field_clock.gd")
 const FONT = preload("res://fonts/MPLUSRounded1c-Bold.ttf")
 
 const VIEW_SIZE := Vector2(720, 1280)
@@ -36,6 +37,15 @@ const TEXT_DARK := Color("5a4632")
 const CREAM := Color("fff7e6")
 ## 天井で出たスキルの目印の色
 const CEILING_COLOR := Color("e2483d")
+## 時計の中心（フィールド左上）
+const CLOCK_POS := Vector2(70, 70)
+## 昼・夕方・夜にフィールド背景へ重ねる色（昼は重ねない）
+const PHASE_TINTS := {
+	FieldClock.Phase.DAY: Color(1, 0.6, 0.25, 0.0),
+	FieldClock.Phase.EVENING: Color(1, 0.55, 0.2, 0.3),
+	FieldClock.Phase.NIGHT: Color(0.04, 0.06, 0.22, 0.55),
+}
+const PHASE_FADE_SEC := 0.35
 
 var sim: Sim
 var hours := 3
@@ -54,6 +64,10 @@ var actor_root: Node2D
 var pseudon: PseudonView
 var storage_box: StorageBox
 var desk: Desk
+var clock: FieldClock
+var phase_tint: ColorRect
+var phase := FieldClock.Phase.DAY
+var phase_tween: Tween
 var dim: ColorRect
 var hud_label: RichTextLabel
 var log_panel: PanelContainer
@@ -159,6 +173,12 @@ func _build_field() -> void:
 	field_clip.clip_contents = true
 	field_clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	field_clip.add_child(FieldBackground.new())
+	# 夕方・夜の色合いは背景だけに重ねる
+	phase_tint = ColorRect.new()
+	phase_tint.size = field_clip.size
+	phase_tint.color = PHASE_TINTS[phase]
+	phase_tint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	field_clip.add_child(phase_tint)
 	field.add_child(field_clip)
 
 	storage_box = StorageBox.new()
@@ -170,9 +190,14 @@ func _build_field() -> void:
 	desk.position = DESK_POS
 	field.add_child(desk)
 
+	clock = FieldClock.new()
+	clock.position = CLOCK_POS
+	clock.time_shown.connect(_on_time_shown)
+	field.add_child(clock)
+
 	var hud := PanelContainer.new()
 	hud.theme = ui_theme
-	hud.position = Vector2(16, 16)
+	hud.position = Vector2(CLOCK_POS.x + FieldClock.RADIUS + 14, 16)
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud.add_theme_stylebox_override("panel", _style(Color(1, 1, 1, 0.85), 20, 8))
 	hud_label = RichTextLabel.new()
@@ -517,6 +542,7 @@ func _on_advance() -> void:
 		return
 	_hide_box_popup()
 	sim.advance(hours * 3600.0)
+	clock.show_elapsed(sim.elapsed_sec)
 	_refresh()
 
 
@@ -530,6 +556,7 @@ func _on_reset() -> void:
 	if cutin_active:
 		return
 	sim.reset()
+	clock.show_elapsed(sim.elapsed_sec, false)
 	for id in piles:
 		piles[id].queue_free()
 	piles.clear()
@@ -537,6 +564,18 @@ func _on_reset() -> void:
 		t.queue_free()
 	_hide_box_popup()
 	_refresh()
+
+
+## 時計の針が回るのに合わせて、昼・夕方・夜の境目を越えたら背景の色を変える
+func _on_time_shown(sec: float) -> void:
+	var p := FieldClock.phase_at(sec)
+	if p == phase:
+		return
+	phase = p
+	if phase_tween != null:
+		phase_tween.kill()
+	phase_tween = create_tween()
+	phase_tween.tween_property(phase_tint, "color", PHASE_TINTS[p], PHASE_FADE_SEC)
 
 
 func _unhandled_input(event: InputEvent) -> void:
