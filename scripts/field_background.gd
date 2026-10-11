@@ -42,22 +42,13 @@ func _draw() -> void:
 	_draw_rock(Vector2(660, 880), 1.2)
 	_draw_rock(Vector2(560, 985), 0.6)
 	_draw_island()
-	_draw_dock()
 	_draw_bush(Vector2(196, 395), 1.0)
 	_draw_bush(Vector2(612, 700), 0.9)
 	for t in _tufts:
 		_draw_tuft(t)
 	for f in _flowers:
 		_draw_flower(f[0], f[1])
-	_draw_table(Vector2(455, 360))
-	_draw_stump(Vector2(150, 760))
-	_draw_stump(Vector2(185, 772))
-	_draw_stump(Vector2(220, 780))
-	_draw_stump(Vector2(668, 520))
-	_draw_shell(Vector2(78, 690))
-	_draw_shell(Vector2(470, 825))
-	_draw_palm(Vector2(545, 410), 1.0)
-	_draw_palm(Vector2(645, 445), 0.9)
+	_draw_bed(Vector2(455, 360))
 
 
 func _draw_sea() -> void:
@@ -105,20 +96,6 @@ func _draw_rock(p: Vector2, s: float) -> void:
 	draw_colored_polygon(small, Color("a9c3d6"))
 
 
-func _draw_dock() -> void:
-	var wood := Color("ead6a8")
-	var dark := Color("c8a874")
-	var deck := PackedVector2Array([Vector2(20, 360), Vector2(205, 322), Vector2(232, 358), Vector2(48, 398)])
-	draw_colored_polygon(deck, wood)
-	for i in range(1, 8):
-		var t := i / 8.0
-		draw_line(Vector2(20, 360).lerp(Vector2(205, 322), t), Vector2(48, 398).lerp(Vector2(232, 358), t), dark, 2.0)
-	ItemArt.outline(self, deck, Color("a88350"), 2.0)
-	for post in [Vector2(30, 362), Vector2(56, 400), Vector2(200, 325)]:
-		draw_rect(Rect2(post + Vector2(-5, 0), Vector2(10, 42)), Color("c49a62"))
-		draw_colored_polygon(ItemArt.ellipse(post, 5, 2.5, 12), Color("e2c18c"))
-
-
 func _draw_bush(p: Vector2, s: float) -> void:
 	draw_colored_polygon(ItemArt.ellipse(p + Vector2(0, 34) * s, 46 * s, 10 * s), Color(0, 0, 0, 0.12))
 	draw_circle(p + Vector2(-20, 8) * s, 30 * s, Color("4cbf3a"))
@@ -141,64 +118,41 @@ func _draw_flower(p: Vector2, col: Color) -> void:
 	draw_circle(p, 3.0, Color("f5a623"))
 
 
-func _draw_table(p: Vector2) -> void:
-	draw_colored_polygon(ItemArt.ellipse(p + Vector2(0, 40), 62, 10), Color(0, 0, 0, 0.12))
-	for x in [-40.0, 34.0]:
-		draw_line(p + Vector2(x, 6), p + Vector2(x - 8, 40), Color("b38a55"), 5.0)
-		draw_line(p + Vector2(x, 6), p + Vector2(x + 8, 40), Color("b38a55"), 5.0)
-	var top := PackedVector2Array([p + Vector2(-56, -6), p + Vector2(44, -14), p + Vector2(58, 8), p + Vector2(-46, 16)])
-	draw_colored_polygon(top, Color("efd9a8"))
-	ItemArt.outline(self, top, Color("b38a55"), 2.0)
-	ItemArt.draw_item(self, "ing_a", p + Vector2(-12, -2), 0.7)
-	ItemArt.draw_item(self, "berry", p + Vector2(12, -4), 0.7)
-
-
-func _draw_stump(p: Vector2) -> void:
-	draw_rect(Rect2(p + Vector2(-8, -18), Vector2(16, 22)), Color("c49a62"))
-	draw_colored_polygon(ItemArt.ellipse(p + Vector2(0, -18), 8, 3.5, 14), Color("e8c890"))
-
-
-func _draw_shell(p: Vector2) -> void:
-	var shell := PackedVector2Array([p + Vector2(-9, 4), p + Vector2(-6, -6), p + Vector2(0, -9), p + Vector2(6, -6), p + Vector2(9, 4)])
-	draw_colored_polygon(shell, Color("f6c9c0"))
-	ItemArt.outline(self, shell, Color("d99a8c"), 1.5)
-
-
-func _draw_palm(base: Vector2, s: float) -> void:
-	var top := base + Vector2(-30, -230) * s
-	draw_colored_polygon(ItemArt.ellipse(base + Vector2(-10, 4) * s, 60 * s, 12 * s), Color(0, 0, 0, 0.14))
-	var trunk := PackedVector2Array()
-	for i in 13:
-		var t := i / 12.0
-		var mid := base.lerp(top, t) + Vector2(sin(t * PI) * 22 * s, 0)
-		trunk.append(mid)
-	var left := PackedVector2Array()
-	var right := PackedVector2Array()
-	for i in trunk.size():
-		var w := lerpf(11.0, 6.0, i / 12.0) * s
-		left.append(trunk[i] + Vector2(-w, 0))
-		right.append(trunk[i] + Vector2(w, 0))
-	right.reverse()
-	draw_colored_polygon(left + right, Color("b97a43"))
-	for i in range(1, 12, 2):
-		draw_line(trunk[i] + Vector2(-8, 0) * s, trunk[i] + Vector2(8, 3) * s, Color("98602f"), 2.0)
-	var angles := [-170.0, -135.0, -100.0, -60.0, -25.0, 10.0, 160.0, 35.0]
-	for deg in angles:
-		_draw_frond(top, deg_to_rad(deg), 95 * s)
-	draw_circle(top + Vector2(-6, 8) * s, 7 * s, Color("8a5a2b"))
-	draw_circle(top + Vector2(6, 9) * s, 7 * s, Color("7a4a26"))
-
-
-func _draw_frond(origin: Vector2, angle: float, length: float) -> void:
-	var dir := Vector2(cos(angle), sin(angle))
-	var normal := Vector2(-dir.y, dir.x)
-	var droop := Vector2(0, length * 0.25)
-	var tip := origin + dir * length + droop
-	var mid := origin + dir * length * 0.55 + droop * 0.4
-	var leaf := PackedVector2Array([
-		origin, mid + normal * 16, tip, mid - normal * 12,
+func _draw_bed(p: Vector2) -> void:
+	var line := Color("a8794a")
+	draw_colored_polygon(ItemArt.ellipse(p + Vector2(0, 40), 68, 10), Color(0, 0, 0, 0.12))
+	for x in [-50.0, 44.0]:
+		draw_rect(Rect2(p + Vector2(x, 26), Vector2(6, 14)), Color("b38a55"))
+	# ヘッドボード（上が丸い板）
+	var head := PackedVector2Array([p + Vector2(-56, -14), p + Vector2(-56, -36)])
+	for i in range(1, 13):
+		var a := PI + PI * i / 12.0
+		head.append(p + Vector2(0, -36) + Vector2(cos(a) * 56, sin(a) * 18))
+	head.append(p + Vector2(56, -14))
+	draw_colored_polygon(head, Color("e8b878"))
+	ItemArt.outline(self, head, line, 2.0)
+	draw_colored_polygon(ItemArt.ellipse(p + Vector2(0, -38), 30, 7, 20), Color("f3cf96"))
+	# 側板
+	var frame := PackedVector2Array([p + Vector2(-60, 12), p + Vector2(60, 12), p + Vector2(60, 30), p + Vector2(-60, 30)])
+	draw_colored_polygon(frame, Color("d9a86c"))
+	ItemArt.outline(self, frame, line, 2.0)
+	# マットレス
+	var mattress := PackedVector2Array([p + Vector2(-52, -22), p + Vector2(52, -22), p + Vector2(58, 12), p + Vector2(-58, 12)])
+	draw_colored_polygon(mattress, Color("fffaf0"))
+	ItemArt.outline(self, mattress, Color("d8ccb4"), 1.5)
+	# まくら
+	var pillow := ItemArt.ellipse(p + Vector2(0, -15), 28, 7, 20)
+	draw_colored_polygon(pillow, Color("ffffff"))
+	ItemArt.outline(self, pillow, Color("d8ccb4"), 1.5)
+	# 掛け布団（手前に垂れる）
+	var blanket := PackedVector2Array([
+		p + Vector2(-55, -4), p + Vector2(55, -4), p + Vector2(59, 12), p + Vector2(59, 24),
+		p + Vector2(30, 27), p + Vector2(0, 25), p + Vector2(-30, 27), p + Vector2(-59, 24), p + Vector2(-59, 12),
 	])
-	draw_colored_polygon(leaf, Color("7fdc3a"))
-	draw_colored_polygon(PackedVector2Array([origin, mid - normal * 12, tip]), Color("5fc22f"))
-	draw_line(origin, mid, Color("4aa82a"), 2.0, true)
-	draw_line(mid, tip, Color("4aa82a"), 2.0, true)
+	draw_colored_polygon(blanket, Color("f7a8c4"))
+	draw_colored_polygon(PackedVector2Array([
+		p + Vector2(-55, -4), p + Vector2(55, -4), p + Vector2(56, 2), p + Vector2(-56, 2),
+	]), Color("fcd3e1"))
+	ItemArt.outline(self, blanket, Color("d97a9e"), 1.5)
+	for d in [Vector2(-38, 8), Vector2(-12, 16), Vector2(14, 7), Vector2(40, 17), Vector2(-44, 20), Vector2(26, 21)]:
+		draw_circle(p + d, 2.5, Color(1, 1, 1, 0.8))
