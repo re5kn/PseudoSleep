@@ -38,6 +38,8 @@ var ingredient_box := {}
 var skill_stock := 0
 ## メインスキルの抽選に続けて外れた回数（天井用）
 var skill_miss := 0
+## ストックのうち天井で発動した分
+var ceiling_stock := 0
 var totals := {}
 
 
@@ -56,6 +58,7 @@ func reset() -> void:
 	ingredient_box.clear()
 	skill_stock = 0
 	skill_miss = 0
+	ceiling_stock = 0
 	totals = new_stats()
 	next_help_at = help_interval_at(0.0)
 
@@ -144,6 +147,7 @@ func _skill_lottery(r: Dictionary) -> void:
 		r["skills"] += 1
 		if by_ceiling:
 			r["skill_ceiling_hits"] += 1
+			ceiling_stock += 1
 		skill_stock += 1
 		skill_miss = 0
 	else:
@@ -195,12 +199,19 @@ func has_icon() -> bool:
 
 ## タップしたときの処理。持っている分をフィールドへ出し、スキルのストックを消費する。
 func drop() -> Dictionary:
-	var result := {"items": pending.duplicate(), "stock": skill_stock}
+	var result := {"items": pending.duplicate(), "stock": skill_stock, "ceiling": ceiling_stock}
 	for id in pending:
 		on_field[id] = int(on_field.get(id, 0)) + int(pending[id])
 	pending.clear()
 	skill_stock = 0
+	ceiling_stock = 0
 	return result
+
+
+## ストック上限を下げたとき、あふれた分を捨てる（天井で出た分は後から捨てる）
+func clamp_stock() -> void:
+	skill_stock = mini(skill_stock, params.max_skill_stock)
+	ceiling_stock = mini(ceiling_stock, skill_stock)
 
 
 func box_for(id: String) -> Dictionary:

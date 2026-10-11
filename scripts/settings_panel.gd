@@ -39,6 +39,9 @@ const NATURE_OPTIONS := [
 
 var params: Params
 var summary_label: Label
+var subskill_title: Label
+## サブスキル id → CheckBox
+var subskill_boxes := {}
 ## Params.Nature → CheckBox
 var up_buttons := {}
 var down_buttons := {}
@@ -52,6 +55,7 @@ func setup(p: Params, base_theme: Theme) -> void:
 	add_theme_stylebox_override("panel", _panel_style())
 	_build()
 	_update_nature_lock()
+	_update_subskill_boxes()
 	_update_summary()
 
 
@@ -103,7 +107,7 @@ func _build() -> void:
 	for spec in NUMBER_ROWS:
 		_number_row(v, spec)
 
-	_section(v, "サブスキル")
+	subskill_title = _section(v, "サブスキル")
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 8)
@@ -120,7 +124,9 @@ func _build() -> void:
 				params.subskills[id] = true
 			else:
 				params.subskills.erase(id)
+			_update_subskill_boxes()
 			_on_changed())
+		subskill_boxes[id] = cb
 		grid.add_child(cb)
 
 	_section(v, "せいかく")
@@ -138,7 +144,7 @@ func _build() -> void:
 	v.add_child(note)
 
 
-func _section(parent: Control, text: String) -> void:
+func _section(parent: Control, text: String) -> Label:
 	var l := _label(text, 20)
 	l.add_theme_color_override("font_color", Color("c27a12"))
 	var box := MarginContainer.new()
@@ -148,6 +154,7 @@ func _section(parent: Control, text: String) -> void:
 	var sep := HSeparator.new()
 	sep.add_theme_stylebox_override("separator", _line_style())
 	parent.add_child(sep)
+	return l
 
 
 func _row(parent: Control, text: String) -> HBoxContainer:
@@ -175,6 +182,10 @@ func _number_row(parent: Control, spec: Array) -> void:
 	spin.value = _get_value(key) * scale
 	spin.value_changed.connect(func(x: float) -> void:
 		_set_value(key, x / scale)
+		if key == "level":
+			# レベルを下げて選べる数が減ったら、下の項目から外す（増えても自動では付けない）
+			params.trim_subskills()
+			_update_subskill_boxes()
 		_on_changed())
 	row.add_child(spin)
 	var unit := _label(spec[2], 18)
@@ -211,6 +222,17 @@ func _nature_row(parent: Control, text: String, group: ButtonGroup, buttons: Dic
 			_on_changed())
 		buttons[kind] = cb
 		grid.add_child(cb)
+
+
+## チェックの状態をそろえ、選べる数に達していたら残りを選べなくする
+func _update_subskill_boxes() -> void:
+	var slots := params.subskill_slots()
+	var full := params.subskills.size() >= slots
+	for id in subskill_boxes:
+		var cb: CheckBox = subskill_boxes[id]
+		cb.set_pressed_no_signal(params.has_subskill(id))
+		cb.disabled = full and not cb.button_pressed
+	subskill_title.text = "サブスキル（%d/%d）" % [params.subskills.size(), slots]
 
 
 ## 上昇で選んだ能力は下降で選べない（逆も同じ）

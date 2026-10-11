@@ -21,6 +21,8 @@ const SUBSKILLS := {
 	"carry_s": "最大所持数アップS",
 }
 
+## サブスキルを選べる数が1つ増えるレベル（最大5つ）
+const SUBSKILL_SLOT_LEVELS: Array[int] = [10, 25, 50, 70, 80]
 ## サブスキルによるおてつだい時間の短縮（おてつだいボーナスを含む）の上限
 const SPEED_REDUCTION_CAP := 0.35
 ## 食材枠2・3が解放されるレベル
@@ -71,6 +73,25 @@ static func level_factor(lv: int) -> float:
 
 func has_subskill(id: String) -> bool:
 	return bool(subskills.get(id, false))
+
+
+## 今のレベルで選べるサブスキルの数
+func subskill_slots() -> int:
+	var n := 0
+	for lv in SUBSKILL_SLOT_LEVELS:
+		if level >= lv:
+			n += 1
+	return n
+
+
+## 選べる数を超えている分のサブスキルを、一覧の下の項目から外す
+func trim_subskills() -> void:
+	var ids: Array = SUBSKILLS.keys()
+	ids.reverse()
+	for id in ids:
+		if subskills.size() <= subskill_slots():
+			return
+		subskills.erase(id)
 
 
 ## せいかくの補正倍率。up / down はその能力が上がるとき／下がるときの値。

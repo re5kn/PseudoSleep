@@ -15,6 +15,7 @@ func _init() -> void:
 	_test_default_params()
 	_test_modifiers()
 	_test_slots_by_level()
+	_test_subskill_slots()
 	_test_skill_ceiling()
 	_test_example1_help_count()
 	_test_example2_help_count()
@@ -169,6 +170,23 @@ func _test_slots_by_level() -> void:
 	check(not items.has("ing_b") and not items.has("ing_c"), "未解放の枠の食材は出ない")
 
 
+func _test_subskill_slots() -> void:
+	print("サブスキルを選べる数")
+	var p := Params.new()
+	var expect := {1: 0, 9: 0, 10: 1, 24: 1, 25: 2, 49: 2, 50: 3, 69: 3, 70: 4, 79: 4, 80: 5, 100: 5}
+	for lv in expect:
+		p.level = lv
+		check(p.subskill_slots() == expect[lv], "Lv.%dは%d個 (got %d)" % [lv, expect[lv], p.subskill_slots()])
+	p.level = 80
+	p.subskills = {"berry_s": true, "speed_m": true, "ing_s": true, "carry_l": true, "carry_s": true}
+	p.level = 50
+	p.trim_subskills()
+	check(p.subskills.keys() == ["berry_s", "speed_m", "ing_s"], "Lv.50に下げると下の項目から外れる (got %s)" % str(p.subskills.keys()))
+	p.level = 80
+	p.trim_subskills()
+	check(p.subskills.size() == 3, "レベルを上げても自動では付かない")
+
+
 func _test_skill_ceiling() -> void:
 	print("スキル発生の天井")
 	var p := Params.new()
@@ -181,9 +199,11 @@ func _test_skill_ceiling() -> void:
 	check(r["helps"] == 4 and r["skills"] == 0, "4回目までは発動しない (helps %d, skills %d)" % [r["helps"], r["skills"]])
 	r = s.advance(p.help_sec() * 0.45)
 	check(r["skills"] == 1 and r["skill_ceiling_hits"] == 1, "5回目で必ず発動")
+	check(s.ceiling_stock == 1, "天井で出たストックを覚えている")
 	r = s.advance(p.help_sec() * 0.45 * 20)
 	check(r["skills"] == 0 and s.skill_miss == 0, "ストックが上限のあいだは抽選せず、不発カウントも0のまま")
-	s.drop()
+	var d := s.drop()
+	check(d["ceiling"] == 1 and s.ceiling_stock == 0, "タップで天井分を知らせて消費")
 	r = s.advance(p.help_sec() * 0.45 * 5)
 	check(r["skills"] == 1, "タップ後はまた5回目で発動 (got %d)" % r["skills"])
 
