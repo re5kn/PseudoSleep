@@ -588,10 +588,11 @@ func _start_cutin(stock: int, by_ceiling: int) -> void:
 	await get_tree().create_timer(CUTIN_PAUSE_SEC).timeout
 	if not cutin_active:
 		return
-	var ceiling_note := ""
+	var lines := PackedStringArray(["%sのメインスキル！" % sim.params.pseudon_name])
 	if by_ceiling > 0:
-		ceiling_note = "（天井で発動）" if by_ceiling == stock else "（うち天井 %d回分）" % by_ceiling
-	bubble_label.text = "メインスキルが発動した！\nストック %d回分%s\n\n（タップでとじる）" % [stock, ceiling_note]
+		lines.append("スキル天井をたたいた！")
+	lines.append("肌のツヤが%dポイントアップ！" % stock)
+	bubble_label.text = "\n".join(lines)
 	bubble.visible = true
 	bubble.scale = Vector2(0.6, 0.6)
 	create_tween().tween_property(bubble, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
