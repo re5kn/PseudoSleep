@@ -379,6 +379,7 @@ func _set_log_open(open: bool) -> void:
 	if open == log_open:
 		return
 	log_open = open
+	_refresh()
 	if open:
 		_update_log()
 		log_scroll.scroll_vertical = 0
@@ -795,7 +796,8 @@ func _refresh() -> void:
 		ceiling_hits = "[color=%s]%s[/color]" % [CEILING_COLOR.to_html(false), ceiling_hits]
 	# 「○回」の縦位置をそろえるため、項目名・回数・天井の3列の表にする
 	var rows := [
-		["おてつだい回数", t["helps"], ""],
+		# 枠のどこをタップしても記録が開くが、ここをバッジにして目立たせる
+		["おてつだい回数", t["helps"], " [bgcolor=#f0a43a][color=#ffffff] 1回ごとの記録 %s [/color][/bgcolor]" % ("◀" if log_open else "▶")],
 		["きのみ回数", t["berry_helps"], ""],
 		["食材回数", t["ingredient_helps"], ""],
 		["スキル回数", t["skills"], ceiling_hits],
@@ -805,7 +807,7 @@ func _refresh() -> void:
 	for row in rows:
 		table += "[cell padding=0,0,16,0]%s[/cell][cell][right]%d回[/right][/cell][cell]%s[/cell]" % row
 	table += "[/table]"
-	hud_label.text = "%s（Lv.%d）\n経過 %s ・ げんき %s\n%s\n[font_size=15][color=#a08c74]タップで1回ごとの記録[/color][/font_size]" % [
+	hud_label.text = "%s（Lv.%d）\n経過 %s ・ げんき %s\n%s" % [
 		sim.params.pseudon_name, sim.params.level, _format_hours(sim.elapsed_sec), genki, table]
 
 	pseudon.show_icon = sim.has_icon()
