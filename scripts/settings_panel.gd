@@ -42,6 +42,8 @@ var summary_label: Label
 var subskill_title: Label
 ## サブスキル id → CheckBox
 var subskill_boxes := {}
+## 数値行のキー → 行（HBoxContainer）
+var number_rows := {}
 ## Params.Nature → CheckBox
 var up_buttons := {}
 var down_buttons := {}
@@ -56,6 +58,7 @@ func setup(p: Params, base_theme: Theme) -> void:
 	_build()
 	_update_nature_lock()
 	_update_subskill_boxes()
+	_update_slot_rows()
 	_update_summary()
 
 
@@ -186,8 +189,10 @@ func _number_row(parent: Control, spec: Array) -> void:
 			# レベルを下げて選べる数が減ったら、下の項目から外す（増えても自動では付けない）
 			params.trim_subskills()
 			_update_subskill_boxes()
+			_update_slot_rows()
 		_on_changed())
 	row.add_child(spin)
+	number_rows[key] = row
 	var unit := _label(spec[2], 18)
 	unit.custom_minimum_size = Vector2(40, 0)
 	row.add_child(unit)
@@ -233,6 +238,19 @@ func _update_subskill_boxes() -> void:
 		cb.set_pressed_no_signal(params.has_subskill(id))
 		cb.disabled = full and not cb.button_pressed
 	subskill_title.text = "サブスキル（%d/%d）" % [params.subskills.size(), slots]
+
+
+## 食材枠2・3は、解放されるレベルに届くまで入力できなくする
+func _update_slot_rows() -> void:
+	for i in range(1, Params.SLOT_UNLOCK_LEVELS.size()):
+		var row: HBoxContainer = number_rows.get("slot%d" % i)
+		if row == null:
+			continue
+		var on := params.level >= Params.SLOT_UNLOCK_LEVELS[i]
+		for child in row.get_children():
+			if child is SpinBox:
+				child.editable = on
+		row.modulate.a = 1.0 if on else 0.4
 
 
 ## 上昇で選んだ能力は下降で選べない（逆も同じ）
