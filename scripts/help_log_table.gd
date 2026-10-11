@@ -88,4 +88,6 @@ func _exclaim(c: Vector2, fill: Color, mark: Color) -> void:
 	var burst := ItemArt.burst(c, 14.0)
 	draw_colored_polygon(burst, fill)
 	ItemArt.outline(self, burst, CEILING_COLOR, 2.0)
-	draw_string(FONT, c + Vector2(-20, 8), "!", HORIZONTAL_ALIGNMENT_CENTER, 40, 24, mark)
+	draw_set_transform(c, ItemArt.EXCLAIM_TILT)
+	draw_string(FONT, Vector2(-20, 8), "!", HORIZONTAL_ALIGNMENT_CENTER, 40, 24, mark)
+	draw_set_transform(Vector2.ZERO)

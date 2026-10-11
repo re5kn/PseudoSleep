@@ -35,6 +35,8 @@ const BURST := [
 	[341, 0.94], [356, 0.74],
 ]
 const BURST_WIDE := 1.3
+## ギザギザの中の「!」は右に約12度傾ける（ラジアン）
+const EXCLAIM_TILT := 0.21
 
 
 ## 中心 c、基準の半径 r のギザギザ。stretch で横に伸ばす（「!!」用）

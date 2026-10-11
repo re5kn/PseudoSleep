@@ -114,6 +114,7 @@ func _draw_exclaims() -> void:
 	ItemArt.outline(self, burst, Color("e2483d"), 3.0)
 	var w := 60.0 * exclaim_count
 	var pos := Vector2(-w / 2, 13)
+	draw_set_transform(Vector2(0, ICON_POS.y), ItemArt.EXCLAIM_TILT, Vector2.ONE * exclaim_anim)
 	draw_string_outline(FONT, pos, text, HORIZONTAL_ALIGNMENT_CENTER, w, 38, 6, Color.WHITE)
 	draw_string(FONT, pos, text, HORIZONTAL_ALIGNMENT_CENTER, w, 38, Color("e2483d"))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
