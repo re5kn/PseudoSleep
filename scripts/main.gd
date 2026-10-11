@@ -28,6 +28,8 @@ const REPEAT_INTERVAL_SEC := 0.08
 ## 設定パネルの幅。ブラウザの幅が VIEW_SIZE.x + これ以上あれば、フィールドと並べて表示する
 const SETTINGS_W := 470.0
 const SETTINGS_SLIDE_SEC := 0.22
+## おてつだいの記録パネルの幅（画面右からせり出す）
+const LOG_W := 540.0
 
 const TEXT_DARK := Color("5a4632")
 const CREAM := Color("fff7e6")
@@ -54,7 +56,11 @@ var ingredient_box: StorageBox
 var dim: ColorRect
 var hud: PanelContainer
 var hud_label: RichTextLabel
-var log_view: Control
+var log_panel: PanelContainer
+var log_scrim: ColorRect
+var log_open := false
+var log_slide := 0.0
+var log_tween: Tween
 var log_title: Label
 var log_scroll: ScrollContainer
 var log_table: HelpLogTable
@@ -95,30 +101,46 @@ func _ready() -> void:
 # ---------------------------------------------------------------- 画面の組み立て
 
 ## 縦長の画面を中央に置く。横に余った領域は背景色のまま。
-## 幅が広く設定パネルを並べて出せるときは、パネルと重ならないようフィールドを右へ寄せる。
+## 幅が広く設定パネル（左）・記録パネル（右）を並べて出せるときは、残りの幅の中央にフィールドを置く。
 func _center_layers() -> void:
 	var view := get_viewport().get_visible_rect().size
 	var offset := ((view - VIEW_SIZE) / 2).floor()
-	if _is_wide():
-		offset.x = floorf(lerpf(offset.x, maxf(offset.x, SETTINGS_W), settings_slide))
+	var wide := _is_wide()
+	if wide:
+		var left := SETTINGS_W * settings_slide
+		var right := LOG_W * log_slide
+		offset.x = floorf(left + (view.x - left - right - VIEW_SIZE.x) / 2)
 	for layer in layers:
 		layer.offset = offset
 	if settings != null:
-		settings.size = Vector2(_settings_width(), view.y)
+		settings.size = Vector2(_side_width(SETTINGS_W), view.y)
 		settings.position = Vector2(-settings.size.x * (1.0 - settings_slide), 0)
 		settings.visible = settings_slide > 0.0
 		settings_scrim.size = view
-		settings_scrim.visible = settings_open and not _is_wide()
+		settings_scrim.visible = settings_open and not wide
 		settings_scrim.modulate.a = settings_slide
+	if log_panel != null:
+		log_panel.size = Vector2(_side_width(LOG_W), view.y)
+		log_panel.position = Vector2(view.x - log_panel.size.x * log_slide, 0)
+		log_panel.visible = log_slide > 0.0
+		log_scrim.size = view
+		log_scrim.visible = log_open and not wide
+		log_scrim.modulate.a = log_slide
 
 
+## 開いているパネルをすべてフィールドの横に並べられるか
 func _is_wide() -> bool:
-	return get_viewport().get_visible_rect().size.x >= VIEW_SIZE.x + SETTINGS_W
+	var need := VIEW_SIZE.x
+	if settings_open:
+		need += SETTINGS_W
+	if log_open:
+		need += LOG_W
+	return get_viewport().get_visible_rect().size.x >= need
 
 
-func _settings_width() -> float:
-	# 狭い画面では外側をタップして閉じられるよう、右に少し隙間を残す
-	return minf(SETTINGS_W, get_viewport().get_visible_rect().size.x - 80.0)
+func _side_width(w: float) -> float:
+	# 狭い画面では外側をタップして閉じられるよう、反対側に少し隙間を残す
+	return minf(w, get_viewport().get_visible_rect().size.x - 80.0)
 
 
 func _layer(n: int) -> CanvasLayer:
@@ -296,37 +318,48 @@ func _build_overlays() -> void:
 	blocker_layer.add_child(blocker)
 
 
-## 画面上部の累計をタップすると開く、おてつだい1回ごとの記録
+## 画面上部の累計をタップすると、画面右からせり出す、おてつだい1回ごとの記録。
+## 設定パネルと同じく中央寄せのずらし（_layer）は使わず、画面右端に付ける
 func _build_log_view() -> void:
-	var layer := _layer(5)
-	log_view = ColorRect.new()
-	log_view.color = Color(0, 0, 0, 0.45)
-	log_view.size = VIEW_SIZE
-	log_view.mouse_filter = Control.MOUSE_FILTER_STOP
-	log_view.visible = false
-	# 枠の外をタップしても閉じる
-	log_view.gui_input.connect(func(event: InputEvent) -> void:
-		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+	var layer := CanvasLayer.new()
+	layer.layer = 7
+	add_child(layer)
+	# 狭い画面ではパネルがフィールドに重なる。外側のタップはここで受けて閉じる
+	log_scrim = ColorRect.new()
+	log_scrim.color = Color(0, 0, 0, 0.35)
+	log_scrim.visible = false
+	log_scrim.mouse_filter = Control.MOUSE_FILTER_STOP
+	log_scrim.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed:
 			_set_log_open(false))
-	layer.add_child(log_view)
+	layer.add_child(log_scrim)
 
-	var panel := PanelContainer.new()
-	panel.theme = ui_theme
-	panel.position = Vector2(32, 48)
-	panel.size = Vector2(VIEW_SIZE.x - 64, VIEW_SIZE.y - 96)
-	panel.add_theme_stylebox_override("panel", _style(CREAM, 28, 18))
-	log_view.add_child(panel)
+	log_panel = PanelContainer.new()
+	log_panel.theme = ui_theme
+	log_panel.visible = false
+	var sb := _style(CREAM, 0, 18)
+	sb.content_margin_top = 16
+	sb.content_margin_bottom = 16
+	sb.corner_radius_top_left = 28
+	sb.corner_radius_bottom_left = 28
+	sb.border_width_left = 4
+	sb.border_color = Color("e6cf9f")
+	sb.shadow_color = Color(0, 0, 0, 0.35)
+	sb.shadow_size = 12
+	log_panel.add_theme_stylebox_override("panel", sb)
+	layer.add_child(log_panel)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 6)
-	panel.add_child(v)
+	log_panel.add_child(v)
 
 	var top := HBoxContainer.new()
 	v.add_child(top)
 	log_title = _label("", 24)
 	log_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(log_title)
-	var close := _button("とじる", Color("ffe9bf"), TEXT_DARK)
-	close.add_theme_font_size_override("font_size", 18)
+	var close := _button("×", Color("ffe9bf"), TEXT_DARK)
+	close.custom_minimum_size = Vector2(56, 56)
+	close.add_theme_font_size_override("font_size", 28)
 	close.pressed.connect(_set_log_open.bind(false))
 	top.add_child(close)
 
@@ -343,11 +376,29 @@ func _build_log_view() -> void:
 
 
 func _set_log_open(open: bool) -> void:
-	log_view.visible = open
+	if open == log_open:
+		return
+	log_open = open
 	if open:
-		log_title.text = "おてつだいの記録（全%d回）" % sim.help_log.size()
-		log_table.set_log(sim.help_log)
+		_update_log()
 		log_scroll.scroll_vertical = 0
+	if log_tween != null:
+		log_tween.kill()
+	log_tween = create_tween()
+	log_tween.tween_method(_set_log_slide, log_slide, 1.0 if open else 0.0, SETTINGS_SLIDE_SEC) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_center_layers()
+
+
+func _set_log_slide(t: float) -> void:
+	log_slide = t
+	_center_layers()
+
+
+## 開いたままでも「すすめる」やリセットに合わせて記録を更新する
+func _update_log() -> void:
+	log_title.text = "おてつだいの記録（全%d回）" % sim.help_log.size()
+	log_table.set_log(sim.help_log)
 
 
 ## 設定パネルは画面の左端に付けるので、中央寄せのずらし（_layer）は使わない
@@ -513,7 +564,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	_hide_box_popup()
 	if Rect2(hud.position, hud.size).has_point(p):
 		swiping = false
-		_set_log_open(true)
+		_set_log_open(not log_open)
 		return
 	for id in piles:
 		if piles[id].hit(p):
@@ -773,3 +824,5 @@ func _refresh() -> void:
 		sim.held_count(), sim.params.carry_limit(), sim.skill_stock, sim.params.max_skill_stock, stock_note,
 		maxi(1, sim.params.skill_ceiling + 1 - sim.skill_miss)])
 	status_label.text = "\n".join(lines)
+	if log_open:
+		_update_log()

@@ -14,10 +14,10 @@ const STRIPE := Color(0.96, 0.9, 0.78, 0.45)
 const EXCLAIM_FILL := Color("ffd93b")
 const CEILING_COLOR := Color("e2483d")
 ## 列の左端と幅
-const COL_K := Vector2(0, 76)
-const COL_TIME := Vector2(96, 96)
-const COL_ITEM := Vector2(216, 190)
-const COL_SKILL := Vector2(424, 170)
+const COL_K := Vector2(0, 56)
+const COL_TIME := Vector2(68, 84)
+const COL_ITEM := Vector2(166, 150)
+const COL_SKILL := Vector2(330, 130)
 
 var header := false
 var entries: Array[Dictionary] = []
