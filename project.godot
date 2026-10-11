@@ -10,7 +10,10 @@ config_version=5
 
 [application]
 
-config/name="PseudoSleep おてつだいシミュレーター"
+boot_splash/bg_color=Color(0.07, 0.07, 0.08, 1)
+boot_splash/image="res://splash.png"
+boot_splash/stretch_mode=0
+config/name="パチモンスリープ"
 run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
