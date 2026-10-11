@@ -126,3 +126,13 @@ static func _meat(ci: CanvasItem, c: Vector2, s: float) -> void:
 	ci.draw_colored_polygon(shade, Color("a9522f"))
 	outline(ci, body, OUTLINE, 1.6 * s)
 	ci.draw_circle(c + Vector2(-4, -3.5).rotated(ang) * s, 2.6 * s, Color(1, 1, 1, 0.55))
+
+
+## タップできるものの上に出す名札。パチモンの「…」と同じ白い楕円に名前を書く
+static func name_tag(ci: CanvasItem, c: Vector2, text: String, font: Font) -> void:
+	var size := 16
+	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	var oval := ellipse(c, w / 2 + 16, 19, 40)
+	ci.draw_colored_polygon(oval, Color.WHITE)
+	outline(ci, oval, Color("0d2738"), 3.0)
+	ci.draw_string(font, c + Vector2(-w / 2, size * 0.36), text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color("0d2738"))

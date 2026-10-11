@@ -11,8 +11,11 @@ const LINE := Color("8a5f32")
 var label := "おてつだい記録"
 
 
+const TAG_POS := Vector2(0, -72)
+
+
 func hit(p: Vector2) -> bool:
-	return Rect2(global_position + Vector2(-60, -50), Vector2(120, 106)).has_point(p)
+	return Rect2(global_position + Vector2(-80, -96), Vector2(160, 150)).has_point(p)
 
 
 func _draw() -> void:
@@ -31,9 +34,7 @@ func _draw() -> void:
 	draw_colored_polygon(edge, WOOD)
 	ItemArt.outline(self, edge, LINE, 2.5)
 	_draw_notebook()
-	var pos := Vector2(-60, 70)
-	draw_string_outline(FONT, pos, label, HORIZONTAL_ALIGNMENT_CENTER, 120, 17, 6, Color(1, 1, 1, 0.9))
-	draw_string(FONT, pos, label, HORIZONTAL_ALIGNMENT_CENTER, 120, 17, Color("5a4632"))
+	ItemArt.name_tag(self, TAG_POS, label, FONT)
 
 
 ## 開いたノートと鉛筆

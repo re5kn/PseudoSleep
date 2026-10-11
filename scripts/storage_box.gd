@@ -10,8 +10,11 @@ var kind: int = Kind.BERRY
 var label := ""
 
 
+const TAG_POS := Vector2(0, -84)
+
+
 func hit(p: Vector2) -> bool:
-	return Rect2(global_position + Vector2(-62, -62), Vector2(124, 120)).has_point(p)
+	return Rect2(global_position + Vector2(-80, -112), Vector2(160, 170)).has_point(p)
 
 
 func _draw() -> void:
@@ -20,9 +23,7 @@ func _draw() -> void:
 		_draw_crate()
 	else:
 		_draw_cooler()
-	var pos := Vector2(-60, 70)
-	draw_string_outline(FONT, pos, label, HORIZONTAL_ALIGNMENT_CENTER, 120, 17, 6, Color(1, 1, 1, 0.9))
-	draw_string(FONT, pos, label, HORIZONTAL_ALIGNMENT_CENTER, 120, 17, Color("5a4632"))
+	ItemArt.name_tag(self, TAG_POS, label, FONT)
 
 
 func _draw_crate() -> void:
