@@ -16,7 +16,8 @@ const ICON_POS := Vector2(0, -152)
 const ICON_RADIUS := 27.0
 ## 手のひらのあたり（画面から見て左がパチモンの右手）。きのみは右手、食材は左手から出す
 const RIGHT_HAND := Vector2(-60, 2)
-const LEFT_HAND := Vector2(58, 6)
+## 食材は手のひらから食材Aの幅（19px）ぶん右に出す
+const LEFT_HAND := Vector2(77, 6)
 
 var show_icon := false
 ## 設定パネルを開ける印（「…」の吹き出し）を出すか
