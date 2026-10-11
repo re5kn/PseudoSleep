@@ -12,6 +12,8 @@ const TEXT_SUB := Color("8a7660")
 const CREAM := Color("fff7e6")
 const ACCENT := Color("f0a43a")
 const LINE := Color("e6cf9f")
+## 補正値の出典
+const SOURCE_URL := "https://pks.raenonx.cc/"
 
 ## 数値の行: [ラベル, Params の項目, 単位, 最小, 最大, 刻み, 画面の値＝Params の値×scale]
 const NUMBER_ROWS := [
@@ -81,6 +83,17 @@ func _build() -> void:
 	close.add_theme_font_size_override("font_size", 28)
 	close.pressed.connect(func() -> void: close_requested.emit())
 	header.add_child(close)
+
+	# 補正値の出典。URL はタップでブラウザに開く
+	var source := RichTextLabel.new()
+	source.bbcode_enabled = true
+	source.fit_content = true
+	source.scroll_active = false
+	source.add_theme_font_size_override("normal_font_size", 15)
+	source.add_theme_color_override("default_color", TEXT_SUB)
+	source.text = "パラメータの種類、補正の種類に応じたパラメータの補正値は[color=#c27a12][url=%s]%s[/url][/color] を参照しています" % [SOURCE_URL, SOURCE_URL]
+	source.meta_clicked.connect(func(meta: Variant) -> void: OS.shell_open(str(meta)))
+	outer.add_child(source)
 
 	summary_label = _label("", 16)
 	summary_label.add_theme_color_override("font_color", TEXT_SUB)
