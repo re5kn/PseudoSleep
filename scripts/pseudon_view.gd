@@ -1,13 +1,18 @@
 extends Node2D
-## パチモンの代わりの図形。所持数があれば頭上にアイコン、スキル発動時は「!」を出す。
+## パチモンの見た目（images/pseudon.png のおばけ）。所持数があれば頭上にアイコン、スキル発動時は「!」を出す。
 ## アイコンが出ていないとき（タップで設定パネルを開けるとき）は「…」の吹き出しを出す。
 
 const ItemArt = preload("res://scripts/item_art.gd")
 const FONT = preload("res://fonts/MPLUSRounded1c-Bold.ttf")
+const TEXTURE = preload("res://images/pseudon.png")
 
 const BODY_RX := 62.0
 const BODY_RY := 56.0
-const ICON_POS := Vector2(0, -112)
+## 画像は高さ SPRITE_HEIGHT で、体の中心より少し上に置く
+const SPRITE_HEIGHT := 190.0
+const SPRITE_CENTER := Vector2(0, -8)
+## 頭上の印（アイコン・「…」・「!」）は画像の上端（-103）よりしっぽ込みで上に出す
+const ICON_POS := Vector2(0, -152)
 const ICON_RADIUS := 27.0
 
 var show_icon := false
@@ -35,45 +40,34 @@ func show_exclaims(n: int) -> void:
 func hit(p: Vector2) -> bool:
 	var local := p - global_position
 	var body := Vector2(local.x / (BODY_RX + 12), local.y / (BODY_RY + 12)).length() <= 1.0
-	var icon := (show_icon or show_menu) and local.distance_to(ICON_POS) <= ICON_RADIUS + 12
+	var icon := (show_icon or show_menu) and local.distance_to(ICON_POS + Vector2(0, -_float_y())) <= ICON_RADIUS + 12
 	return body or icon
 
 
+## 体が浮き上がっている量（上向きが正）
+func _float_y() -> float:
+	return sin(_t * 1.8) * 6.0
+
+
 func _draw() -> void:
-	var breathe := sin(_t * 2.2) * 0.02
-	draw_colored_polygon(ItemArt.ellipse(Vector2(0, BODY_RY - 4), BODY_RX * 0.95, 15), Color(0, 0, 0, 0.18))
-	draw_set_transform(Vector2(0, BODY_RY * -breathe), 0.0, Vector2(1.0 - breathe, 1.0 + breathe))
+	# ふわふわ浮いて、影は浮き上がるほど小さくなる。頭上のアイコンと「…」も体と一緒に動かし、間隔を一定に保つ
+	var float_y := _float_y()
+	var shadow_s := 1.0 - float_y / 60.0
+	draw_colored_polygon(ItemArt.ellipse(Vector2(0, BODY_RY + 8), BODY_RX * 0.8 * shadow_s, 12 * shadow_s), Color(0, 0, 0, 0.22))
+	draw_set_transform(Vector2(0, -float_y), 0.0, Vector2.ONE)
 	_draw_body()
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	if show_icon:
-		_draw_icon(sin(_t * 3.0) * 4.0)
+		_draw_icon(-float_y)
 	elif show_menu and exclaim_count == 0:
-		_draw_menu(sin(_t * 3.0) * 4.0)
+		_draw_menu(-float_y)
 	if exclaim_count > 0:
 		_draw_exclaims()
 
 
 func _draw_body() -> void:
-	var line := Color("8a5a2b")
-	for side in [-1.0, 1.0]:
-		var ear := PackedVector2Array([
-			Vector2(side * 22, -46), Vector2(side * 50, -78), Vector2(side * 52, -30),
-		])
-		draw_colored_polygon(ear, Color("f6b75a"))
-		ItemArt.outline(self, ear, line, 3.0)
-		draw_colored_polygon(PackedVector2Array([
-			Vector2(side * 32, -46), Vector2(side * 47, -66), Vector2(side * 47, -40),
-		]), Color("fde3a7"))
-	var body := ItemArt.ellipse(Vector2.ZERO, BODY_RX, BODY_RY, 40)
-	draw_colored_polygon(body, Color("f9c46b"))
-	draw_colored_polygon(ItemArt.ellipse(Vector2(0, 16), 38, 32, 32), Color("fff1cc"))
-	ItemArt.outline(self, body, line, 3.0)
-	# 寝顔
-	draw_arc(Vector2(-20, -10), 8, 0.2, PI - 0.2, 10, line, 3.0, true)
-	draw_arc(Vector2(20, -10), 8, 0.2, PI - 0.2, 10, line, 3.0, true)
-	draw_circle(Vector2(-36, 4), 7, Color(1.0, 0.55, 0.55, 0.45))
-	draw_circle(Vector2(36, 4), 7, Color(1.0, 0.55, 0.55, 0.45))
-	draw_arc(Vector2(0, 4), 5, 0.3, PI - 0.3, 8, line, 2.5, true)
+	var size := Vector2(TEXTURE.get_width(), TEXTURE.get_height()) * (SPRITE_HEIGHT / TEXTURE.get_height())
+	draw_texture_rect(TEXTURE, Rect2(SPRITE_CENTER - size / 2, size), false)
 
 
 func _draw_icon(bob: float) -> void:
