@@ -18,8 +18,7 @@ const FIELD_HEIGHT := 1040.0
 const PSEUDON_POS := Vector2(360, 505)
 const PILE_Y := 636.0
 const PILE_GAP := 88.0
-const BERRY_BOX_POS := Vector2(584, 772)
-const INGREDIENT_BOX_POS := Vector2(138, 764)
+const BOX_POS := Vector2(138, 764)
 const DESK_POS := Vector2(606, 560)
 const MIN_HOURS := 1
 const MAX_HOURS := 24
@@ -53,8 +52,7 @@ var layers: Array[CanvasLayer] = []
 var ui_theme: Theme
 var actor_root: Node2D
 var pseudon: PseudonView
-var berry_box: StorageBox
-var ingredient_box: StorageBox
+var storage_box: StorageBox
 var desk: Desk
 var dim: ColorRect
 var hud_label: RichTextLabel
@@ -163,21 +161,14 @@ func _build_field() -> void:
 	field_clip.add_child(FieldBackground.new())
 	field.add_child(field_clip)
 
-	ingredient_box = StorageBox.new()
-	ingredient_box.kind = StorageBox.Kind.INGREDIENT
-	ingredient_box.label = "食材収容箱"
-	ingredient_box.position = INGREDIENT_BOX_POS
-	field.add_child(ingredient_box)
+	storage_box = StorageBox.new()
+	storage_box.label = "きのみ・食材収容箱"
+	storage_box.position = BOX_POS
+	field.add_child(storage_box)
 
 	desk = Desk.new()
 	desk.position = DESK_POS
 	field.add_child(desk)
-
-	berry_box = StorageBox.new()
-	berry_box.kind = StorageBox.Kind.BERRY
-	berry_box.label = "きのみ収容箱"
-	berry_box.position = BERRY_BOX_POS
-	field.add_child(berry_box)
 
 	var hud := PanelContainer.new()
 	hud.theme = ui_theme
@@ -584,13 +575,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if desk.hit(p):
 		_set_log_open(not log_open)
 		return
-	if berry_box.hit(p):
-		if not had_popup or box_popup.get_meta("kind", -1) != StorageBox.Kind.BERRY:
-			_show_box_popup(berry_box)
-		return
-	if ingredient_box.hit(p):
-		if not had_popup or box_popup.get_meta("kind", -1) != StorageBox.Kind.INGREDIENT:
-			_show_box_popup(ingredient_box)
+	if storage_box.hit(p):
+		if not had_popup:
+			_show_box_popup(storage_box)
 		return
 
 
@@ -632,8 +619,8 @@ func _collect(id: String) -> void:
 		pile.set_count(pile.count - got)
 		_toast(id, "×%d" % got)
 	else:
-		var box_name := "きのみ収容箱" if sim.params.is_berry(id) else "食材収容箱"
-		_toast(id, "%sがいっぱい" % box_name)
+		var kind_name := "きのみ" if sim.params.is_berry(id) else "食材"
+		_toast(id, "%sがいっぱい" % kind_name)
 		pile.bounce()
 	_refresh()
 
@@ -756,16 +743,11 @@ func _toast(id: String, text: String) -> void:
 
 func _show_box_popup(box: StorageBox) -> void:
 	var lines: Array[String] = []
-	if box.kind == StorageBox.Kind.BERRY:
-		lines.append("きのみ収容箱")
-		lines.append("%d / %d" % [Sim.sum(sim.berry_box), Sim.BERRY_BOX_MAX])
-	else:
-		lines.append("食材収容箱")
-		lines.append("%d / %d" % [Sim.sum(sim.ingredient_box), Sim.INGREDIENT_BOX_MAX])
-		for ing in sim.params.ingredients:
-			lines.append("%s %d" % [ing["name"], int(sim.ingredient_box.get(ing["id"], 0))])
+	lines.append("きのみ %d/%d" % [Sim.sum(sim.berry_box), Sim.BERRY_BOX_MAX])
+	lines.append("食材　%d/%d" % [Sim.sum(sim.ingredient_box), Sim.INGREDIENT_BOX_MAX])
+	for ing in sim.params.ingredients:
+		lines.append("%s %d" % [ing["name"], int(sim.ingredient_box.get(ing["id"], 0))])
 	box_popup_label.text = "\n".join(lines)
-	box_popup.set_meta("kind", box.kind)
 	box_popup.reset_size()
 	box_popup.visible = true
 	var s := box_popup.get_combined_minimum_size()
