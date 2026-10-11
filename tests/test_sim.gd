@@ -18,6 +18,7 @@ func _init() -> void:
 	_test_subskill_slots()
 	_test_skill_ceiling()
 	_test_skill_ceiling_stock2()
+	_test_name_width()
 	_test_example1_help_count()
 	_test_example2_help_count()
 	_test_carry_over()
@@ -238,6 +239,17 @@ func _test_skill_ceiling_stock2() -> void:
 	check(r["skills"] == 0 and s.skill_miss == 0, "ストックが上限になったら抽選せず、不発カウントも増えない")
 	var d := s.drop()
 	check(d["stock"] == 2 and d["ceiling"] == 1, "タップでストック2、うち天井1を知らせる (stock %d, ceiling %d)" % [d["stock"], d["ceiling"]])
+
+
+func _test_name_width() -> void:
+	print("名前の長さ（全角6文字・半角12文字まで）")
+	check(Params.name_width("ベアビヲ9") == 9, "全角4＋半角1で9 (got %d)" % Params.name_width("ベアビヲ9"))
+	check(Params.clip_name("あいうえおか") == "あいうえおか", "全角6文字はそのまま")
+	check(Params.clip_name("あいうえおかき") == "あいうえおか", "全角7文字目は削る")
+	check(Params.clip_name("abcdefghijkl") == "abcdefghijkl", "半角12文字はそのまま")
+	check(Params.clip_name("abcdefghijklm") == "abcdefghijkl", "半角13文字目は削る")
+	check(Params.clip_name("ベアビヲ9abcd") == "ベアビヲ9abc", "混在は合計12まで (got %s)" % Params.clip_name("ベアビヲ9abcd"))
+	check(Params.clip_name("ｱｲｳｴｵｶｷｸｹｺｻｼｽ") == "ｱｲｳｴｵｶｷｸｹｺｻｼ", "半角カナは半角として数える")
 
 
 func _test_example1_help_count() -> void:

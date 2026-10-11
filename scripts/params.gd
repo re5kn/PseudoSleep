@@ -27,6 +27,8 @@ const SUBSKILL_SLOT_LEVELS: Array[int] = [10, 25, 50, 70, 80]
 const SPEED_REDUCTION_CAP := 0.35
 ## 食材枠2・3が解放されるレベル
 const SLOT_UNLOCK_LEVELS: Array[int] = [1, 30, 60]
+## 名前の長さの上限（半角1・全角2で数える。全角なら6文字、半角なら12文字）
+const NAME_MAX_WIDTH := 12
 
 var pseudon_name := "ベアビヲ9"
 ## 基準おてつだい時間（秒）
@@ -69,6 +71,30 @@ var ingredients: Array = [
 
 static func level_factor(lv: int) -> float:
 	return 1.0 - 0.002 * (lv - 1)
+
+
+## 名前の長さ。ASCII と半角カナは1、それ以外（全角）は2で数える。
+static func name_width(s: String) -> int:
+	var w := 0
+	for i in s.length():
+		w += _char_width(s.unicode_at(i))
+	return w
+
+
+static func _char_width(c: int) -> int:
+	if c < 0x80 or (c >= 0xFF61 and c <= 0xFF9F):
+		return 1
+	return 2
+
+
+## 長さが NAME_MAX_WIDTH を超える分を後ろから削る
+static func clip_name(s: String) -> String:
+	var w := 0
+	for i in s.length():
+		w += _char_width(s.unicode_at(i))
+		if w > NAME_MAX_WIDTH:
+			return s.substr(0, i)
+	return s
 
 
 func has_subskill(id: String) -> bool:
