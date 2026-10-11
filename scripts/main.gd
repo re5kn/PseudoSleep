@@ -673,7 +673,7 @@ func _refresh() -> void:
 	var genki := "81以上" if sim.genki_mode == Sim.GenkiMode.ALWAYS_HIGH else str(sim.genki_at(sim.elapsed_sec))
 	# おてつだいの累計（リセットで 0 に戻る）
 	var t := sim.totals
-	var ceiling_hits := "（%d回）" % t["skill_ceiling_hits"]
+	var ceiling_hits := "（天井%d）" % t["skill_ceiling_hits"]
 	if t["skill_ceiling_hits"] > 0:
 		ceiling_hits = "[color=%s]%s[/color]" % [CEILING_COLOR.to_html(false), ceiling_hits]
 	# 「○回」の縦位置をそろえるため、項目名・回数・天井の3列の表にする
@@ -686,7 +686,7 @@ func _refresh() -> void:
 	]
 	var table := "[table=3]"
 	for row in rows:
-		table += "[cell]%s：[/cell][cell][right]%d回[/right][/cell][cell]%s[/cell]" % row
+		table += "[cell padding=0,0,16,0]%s[/cell][cell][right]%d回[/right][/cell][cell]%s[/cell]" % row
 	table += "[/table]"
 	hud_label.text = "%s（Lv.%d）\n経過 %s ・ げんき %s\n%s" % [
 		sim.params.pseudon_name, sim.params.level, _format_hours(sim.elapsed_sec), genki, table]
