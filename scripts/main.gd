@@ -673,12 +673,23 @@ func _refresh() -> void:
 	var genki := "81以上" if sim.genki_mode == Sim.GenkiMode.ALWAYS_HIGH else str(sim.genki_at(sim.elapsed_sec))
 	# おてつだいの累計（リセットで 0 に戻る）
 	var t := sim.totals
-	var ceiling_hits := "うち天井%d回" % t["skill_ceiling_hits"]
+	var ceiling_hits := "（%d回）" % t["skill_ceiling_hits"]
 	if t["skill_ceiling_hits"] > 0:
 		ceiling_hits = "[color=%s]%s[/color]" % [CEILING_COLOR.to_html(false), ceiling_hits]
-	hud_label.text = "%s（Lv.%d）\n経過 %s ・ げんき %s\nおてつだい回数：%d回\nきのみ回数：%d回\n食材回数：%d回\nスキル回数：%d回（%s）\nいつのまに育成回数：%d回" % [
-		sim.params.pseudon_name, sim.params.level, _format_hours(sim.elapsed_sec), genki,
-		t["helps"], t["berry_helps"], t["ingredient_helps"], t["skills"], ceiling_hits, t["full_helps"]]
+	# 「○回」の縦位置をそろえるため、項目名・回数・天井の3列の表にする
+	var rows := [
+		["おてつだい回数", t["helps"], ""],
+		["きのみ回数", t["berry_helps"], ""],
+		["食材回数", t["ingredient_helps"], ""],
+		["スキル回数", t["skills"], ceiling_hits],
+		["いつのまに育成回数", t["full_helps"], ""],
+	]
+	var table := "[table=3]"
+	for row in rows:
+		table += "[cell]%s：[/cell][cell][right]%d回[/right][/cell][cell]%s[/cell]" % row
+	table += "[/table]"
+	hud_label.text = "%s（Lv.%d）\n経過 %s ・ げんき %s\n%s" % [
+		sim.params.pseudon_name, sim.params.level, _format_hours(sim.elapsed_sec), genki, table]
 
 	pseudon.show_icon = sim.has_icon()
 	pseudon.show_menu = not pseudon.show_icon and not settings_open
