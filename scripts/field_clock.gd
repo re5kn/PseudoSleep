@@ -1,5 +1,5 @@
 extends Node2D
-## フィールド左上のアナログ時計と、時刻から決まる昼・夕方・夜の区分。
+## フィールド右上のアナログ時計と、時刻から決まる昼・夕方・夜の区分。
 ## 時計は「すすめる」で時間が進んだとき、短針・長針が回って新しい時刻まで動く。
 
 enum Phase { DAY, EVENING, NIGHT }
@@ -39,6 +39,18 @@ signal time_shown(sec: float)
 ## 通算秒をその日の 0〜86400 秒に直す
 static func time_of_day(sec: float) -> float:
 	return fposmod(sec, DAY_SEC)
+
+
+## 何日目か（初日の 7:00 からが1日目、0:00 で日付が変わる）
+static func day_number(sec: float) -> int:
+	return int(floor(sec / DAY_SEC)) + 1
+
+
+## リセットからの経過秒を「n日目」と「H:MM」にする
+static func day_and_clock(elapsed_sec: float) -> Array:
+	var sec := START_SEC + elapsed_sec
+	var total_min := int(time_of_day(sec) / 60.0)
+	return [day_number(sec), "%d:%02d" % [total_min / 60, total_min % 60]]
 
 
 static func phase_at(sec: float) -> int:

@@ -4,6 +4,7 @@ extends Control
 
 const ItemArt = preload("res://scripts/item_art.gd")
 const Sim = preload("res://scripts/sim.gd")
+const FieldClock = preload("res://scripts/field_clock.gd")
 const FONT = preload("res://fonts/MPLUSRounded1c-Bold.ttf")
 
 const ROW_H := 46.0
@@ -14,10 +15,11 @@ const STRIPE := Color(0.96, 0.9, 0.78, 0.45)
 const EXCLAIM_FILL := Color("ffd93b")
 const CEILING_COLOR := Color("e2483d")
 ## 列の左端と幅
-const COL_K := Vector2(0, 56)
-const COL_TIME := Vector2(68, 84)
-const COL_ITEM := Vector2(166, 150)
-const COL_SKILL := Vector2(330, 130)
+const COL_K := Vector2(0, 48)
+const COL_DAY := Vector2(58, 72)
+const COL_TIME := Vector2(136, 70)
+const COL_ITEM := Vector2(216, 140)
+const COL_SKILL := Vector2(364, 120)
 
 var header := false
 var entries: Array[Dictionary] = []
@@ -43,7 +45,8 @@ func _text(s: String, col: Vector2, y: float, align: HorizontalAlignment, color:
 func _draw() -> void:
 	if header:
 		_text("回", COL_K, 0, HORIZONTAL_ALIGNMENT_RIGHT, TEXT_MUTED)
-		_text("経過", COL_TIME, 0, HORIZONTAL_ALIGNMENT_CENTER, TEXT_MUTED)
+		_text("日", COL_DAY, 0, HORIZONTAL_ALIGNMENT_CENTER, TEXT_MUTED)
+		_text("時刻", COL_TIME, 0, HORIZONTAL_ALIGNMENT_CENTER, TEXT_MUTED)
 		_text("獲得", COL_ITEM, 0, HORIZONTAL_ALIGNMENT_LEFT, TEXT_MUTED)
 		_text("スキル", COL_SKILL, 0, HORIZONTAL_ALIGNMENT_LEFT, TEXT_MUTED)
 		return
@@ -66,8 +69,10 @@ func _draw_row(i: int, y: float) -> void:
 	if i % 2 == 1:
 		draw_rect(Rect2(0, y, size.x, ROW_H), STRIPE)
 	_text(str(i + 1), COL_K, y, HORIZONTAL_ALIGNMENT_RIGHT, TEXT_DARK)
-	var total_min := int(e["t"] / 60.0)
-	_text("%d:%02d" % [total_min / 60, total_min % 60], COL_TIME, y, HORIZONTAL_ALIGNMENT_CENTER, TEXT_DARK)
+	# 時計と同じ時刻（朝7:00 始まり）で出す
+	var when := FieldClock.day_and_clock(e["t"])
+	_text("%d日目" % when[0], COL_DAY, y, HORIZONTAL_ALIGNMENT_CENTER, TEXT_DARK)
+	_text(when[1], COL_TIME, y, HORIZONTAL_ALIGNMENT_CENTER, TEXT_DARK)
 	var cy := y + ROW_H / 2
 	if e["id"] == "":
 		_text("いつのまに育成", COL_ITEM, y, HORIZONTAL_ALIGNMENT_LEFT, TEXT_MUTED)

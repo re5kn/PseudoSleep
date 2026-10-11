@@ -410,3 +410,8 @@ func _test_time_phase() -> void:
 	var cases := [[7, D], [15.99, D], [16, E], [17.99, E], [18, N], [23.5, N], [0, N], [6.99, N], [31, D], [40, E], [42, N]]
 	for c in cases:
 		check(FieldClock.phase_at(c[0] * 3600.0) == c[1], "%.2f h -> phase %d" % [c[0], c[1]])
+	# 記録の「n日目」「時刻」はリセットからの経過秒から出す
+	check(FieldClock.day_and_clock(0.0) == [1, "7:00"], "elapsed 0 -> day 1 7:00")
+	check(FieldClock.day_and_clock(16 * 3600.0 + 59 * 60 + 59) == [1, "23:59"], "elapsed 16:59:59 -> day 1 23:59")
+	check(FieldClock.day_and_clock(17 * 3600.0) == [2, "0:00"], "elapsed 17h -> day 2 0:00")
+	check(FieldClock.day_and_clock(48 * 3600.0 + 30 * 60) == [3, "7:30"], "elapsed 48.5h -> day 3 7:30")
