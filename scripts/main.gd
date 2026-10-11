@@ -703,7 +703,7 @@ func _refresh() -> void:
 	if sim.ceiling_stock > 0:
 		stock_note = " [bgcolor=%s][color=#ffffff] 天井%s [/color][/bgcolor]" % [
 			CEILING_COLOR.to_html(false), "" if sim.ceiling_stock == sim.skill_stock else "×%d" % sim.ceiling_stock]
-	lines.append("所持 %d/%d　スキルストック %d/%d%s　天井まで あと%d回" % [
+	lines.append("所持 %d/%d　スキルストック %d/%d%s　スキル天井まで あと%d回" % [
 		sim.held_count(), sim.params.carry_limit(), sim.skill_stock, sim.params.max_skill_stock, stock_note,
 		maxi(1, sim.params.skill_ceiling + 1 - sim.skill_miss)])
 	status_label.text = "\n".join(lines)
