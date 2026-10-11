@@ -660,6 +660,7 @@ func _refresh() -> void:
 		sim.params.pseudon_name, sim.params.level, _format_hours(sim.elapsed_sec), genki]
 
 	pseudon.show_icon = sim.has_icon()
+	pseudon.show_menu = not pseudon.show_icon
 	pseudon.icon_full = sim.is_full()
 
 	var lines: Array[String] = []
