@@ -12,6 +12,18 @@ static func ellipse(c: Vector2, rx: float, ry: float, n: int = 28) -> PackedVect
 	return pts
 
 
+## 中心 c、半分の大きさ half、角の半径 r の角丸四角形
+static func rounded_rect(c: Vector2, half: Vector2, r: float, n: int = 6) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	var corners := [Vector2(1, 1), Vector2(-1, 1), Vector2(-1, -1), Vector2(1, -1)]
+	for k in 4:
+		var q: Vector2 = c + (half - Vector2(r, r)) * corners[k]
+		for i in n + 1:
+			var a := PI / 2 * k + PI / 2 * i / n
+			pts.append(q + Vector2(cos(a), sin(a)) * r)
+	return pts
+
+
 static func outline(ci: CanvasItem, pts: PackedVector2Array, color: Color, width: float) -> void:
 	var closed := pts.duplicate()
 	closed.append(pts[0])
@@ -126,3 +138,13 @@ static func _meat(ci: CanvasItem, c: Vector2, s: float) -> void:
 	ci.draw_colored_polygon(shade, Color("a9522f"))
 	outline(ci, body, OUTLINE, 1.6 * s)
 	ci.draw_circle(c + Vector2(-4, -3.5).rotated(ang) * s, 2.6 * s, Color(1, 1, 1, 0.55))
+
+
+## タップできるものの上に出す名札。パチモンの「…」と同じ白い角丸四角に名前を書く
+static func name_tag(ci: CanvasItem, c: Vector2, text: String, font: Font) -> void:
+	var size := 16
+	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	var oval := rounded_rect(c, Vector2(w / 2 + 12, 17), 10)
+	ci.draw_colored_polygon(oval, Color.WHITE)
+	outline(ci, oval, Color("0d2738"), 3.0)
+	ci.draw_string(font, c + Vector2(-w / 2, size * 0.36), text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color("0d2738"))

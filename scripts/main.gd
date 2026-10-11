@@ -9,15 +9,18 @@ const FlyingItem = preload("res://scripts/flying_item.gd")
 const StorageBox = preload("res://scripts/storage_box.gd")
 const ItemIcon = preload("res://scripts/item_icon.gd")
 const SettingsPanel = preload("res://scripts/settings_panel.gd")
+const HelpLogTable = preload("res://scripts/help_log_table.gd")
+const Desk = preload("res://scripts/desk.gd")
 const FONT = preload("res://fonts/MPLUSRounded1c-Bold.ttf")
 
 const VIEW_SIZE := Vector2(720, 1280)
 const FIELD_HEIGHT := 1040.0
 const PSEUDON_POS := Vector2(360, 505)
 const PILE_Y := 636.0
-const PILE_GAP := 100.0
-const BERRY_BOX_POS := Vector2(575, 745)
-const INGREDIENT_BOX_POS := Vector2(150, 735)
+const PILE_GAP := 88.0
+const BERRY_BOX_POS := Vector2(584, 772)
+const INGREDIENT_BOX_POS := Vector2(138, 764)
+const DESK_POS := Vector2(606, 560)
 const MIN_HOURS := 1
 const MAX_HOURS := 24
 const TOAST_SEC := 2.5
@@ -27,6 +30,8 @@ const REPEAT_INTERVAL_SEC := 0.08
 ## 設定パネルの幅。ブラウザの幅が VIEW_SIZE.x + これ以上あれば、フィールドと並べて表示する
 const SETTINGS_W := 470.0
 const SETTINGS_SLIDE_SEC := 0.22
+## おてつだいの記録パネルの幅（画面右からせり出す）
+const LOG_W := 540.0
 
 const TEXT_DARK := Color("5a4632")
 const CREAM := Color("fff7e6")
@@ -50,8 +55,17 @@ var actor_root: Node2D
 var pseudon: PseudonView
 var berry_box: StorageBox
 var ingredient_box: StorageBox
+var desk: Desk
 var dim: ColorRect
 var hud_label: RichTextLabel
+var log_panel: PanelContainer
+var log_scrim: ColorRect
+var log_open := false
+var log_slide := 0.0
+var log_tween: Tween
+var log_title: Label
+var log_scroll: ScrollContainer
+var log_table: HelpLogTable
 var hours_label: Label
 var advance_button: Button
 var genki_button: Button
@@ -79,6 +93,7 @@ func _ready() -> void:
 	_build_field()
 	_build_panel()
 	_build_overlays()
+	_build_log_view()
 	_build_settings()
 	_refresh()
 	get_viewport().size_changed.connect(_center_layers)
@@ -88,30 +103,46 @@ func _ready() -> void:
 # ---------------------------------------------------------------- 画面の組み立て
 
 ## 縦長の画面を中央に置く。横に余った領域は背景色のまま。
-## 幅が広く設定パネルを並べて出せるときは、パネルと重ならないようフィールドを右へ寄せる。
+## 幅が広く設定パネル（左）・記録パネル（右）を並べて出せるときは、残りの幅の中央にフィールドを置く。
 func _center_layers() -> void:
 	var view := get_viewport().get_visible_rect().size
 	var offset := ((view - VIEW_SIZE) / 2).floor()
-	if _is_wide():
-		offset.x = floorf(lerpf(offset.x, maxf(offset.x, SETTINGS_W), settings_slide))
+	var wide := _is_wide()
+	if wide:
+		var left := SETTINGS_W * settings_slide
+		var right := LOG_W * log_slide
+		offset.x = floorf(left + (view.x - left - right - VIEW_SIZE.x) / 2)
 	for layer in layers:
 		layer.offset = offset
 	if settings != null:
-		settings.size = Vector2(_settings_width(), view.y)
+		settings.size = Vector2(_side_width(SETTINGS_W), view.y)
 		settings.position = Vector2(-settings.size.x * (1.0 - settings_slide), 0)
 		settings.visible = settings_slide > 0.0
 		settings_scrim.size = view
-		settings_scrim.visible = settings_open and not _is_wide()
+		settings_scrim.visible = settings_open and not wide
 		settings_scrim.modulate.a = settings_slide
+	if log_panel != null:
+		log_panel.size = Vector2(_side_width(LOG_W), view.y)
+		log_panel.position = Vector2(view.x - log_panel.size.x * log_slide, 0)
+		log_panel.visible = log_slide > 0.0
+		log_scrim.size = view
+		log_scrim.visible = log_open and not wide
+		log_scrim.modulate.a = log_slide
 
 
+## 開いているパネルをすべてフィールドの横に並べられるか
 func _is_wide() -> bool:
-	return get_viewport().get_visible_rect().size.x >= VIEW_SIZE.x + SETTINGS_W
+	var need := VIEW_SIZE.x
+	if settings_open:
+		need += SETTINGS_W
+	if log_open:
+		need += LOG_W
+	return get_viewport().get_visible_rect().size.x >= need
 
 
-func _settings_width() -> float:
-	# 狭い画面では外側をタップして閉じられるよう、右に少し隙間を残す
-	return minf(SETTINGS_W, get_viewport().get_visible_rect().size.x - 80.0)
+func _side_width(w: float) -> float:
+	# 狭い画面では外側をタップして閉じられるよう、反対側に少し隙間を残す
+	return minf(w, get_viewport().get_visible_rect().size.x - 80.0)
 
 
 func _layer(n: int) -> CanvasLayer:
@@ -137,6 +168,10 @@ func _build_field() -> void:
 	ingredient_box.label = "食材収容箱"
 	ingredient_box.position = INGREDIENT_BOX_POS
 	field.add_child(ingredient_box)
+
+	desk = Desk.new()
+	desk.position = DESK_POS
+	field.add_child(desk)
 
 	berry_box = StorageBox.new()
 	berry_box.kind = StorageBox.Kind.BERRY
@@ -287,6 +322,90 @@ func _build_overlays() -> void:
 	blocker.visible = false
 	blocker.gui_input.connect(_on_blocker_input)
 	blocker_layer.add_child(blocker)
+
+
+## フィールドの机をタップすると、画面右からせり出す、おてつだい1回ごとの記録。
+## 設定パネルと同じく中央寄せのずらし（_layer）は使わず、画面右端に付ける
+func _build_log_view() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 7
+	add_child(layer)
+	# 狭い画面ではパネルがフィールドに重なる。外側のタップはここで受けて閉じる
+	log_scrim = ColorRect.new()
+	log_scrim.color = Color(0, 0, 0, 0.35)
+	log_scrim.visible = false
+	log_scrim.mouse_filter = Control.MOUSE_FILTER_STOP
+	log_scrim.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed:
+			_set_log_open(false))
+	layer.add_child(log_scrim)
+
+	log_panel = PanelContainer.new()
+	log_panel.theme = ui_theme
+	log_panel.visible = false
+	var sb := _style(CREAM, 0, 18)
+	sb.content_margin_top = 16
+	sb.content_margin_bottom = 16
+	sb.corner_radius_top_left = 28
+	sb.corner_radius_bottom_left = 28
+	sb.border_width_left = 4
+	sb.border_color = Color("e6cf9f")
+	sb.shadow_color = Color(0, 0, 0, 0.35)
+	sb.shadow_size = 12
+	log_panel.add_theme_stylebox_override("panel", sb)
+	layer.add_child(log_panel)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	log_panel.add_child(v)
+
+	var top := HBoxContainer.new()
+	v.add_child(top)
+	log_title = _label("", 24)
+	log_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(log_title)
+	var close := _button("×", Color("ffe9bf"), TEXT_DARK)
+	close.custom_minimum_size = Vector2(56, 56)
+	close.add_theme_font_size_override("font_size", 28)
+	close.pressed.connect(_set_log_open.bind(false))
+	top.add_child(close)
+
+	v.add_child(HelpLogTable.new(true))
+	log_scroll = ScrollContainer.new()
+	log_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	log_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(log_scroll)
+	log_table = HelpLogTable.new()
+	log_table.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	log_scroll.add_child(log_table)
+	log_scroll.get_v_scroll_bar().value_changed.connect(func(_v: float) -> void: log_table.queue_redraw())
+	log_scroll.resized.connect(log_table.queue_redraw)
+
+
+func _set_log_open(open: bool) -> void:
+	if open == log_open:
+		return
+	log_open = open
+	_refresh()
+	if open:
+		_update_log()
+		log_scroll.scroll_vertical = 0
+	if log_tween != null:
+		log_tween.kill()
+	log_tween = create_tween()
+	log_tween.tween_method(_set_log_slide, log_slide, 1.0 if open else 0.0, SETTINGS_SLIDE_SEC) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_center_layers()
+
+
+func _set_log_slide(t: float) -> void:
+	log_slide = t
+	_center_layers()
+
+
+## 開いたままでも「すすめる」やリセットに合わせて記録を更新する
+func _update_log() -> void:
+	log_title.text = "おてつだいの記録（全%d回）" % sim.help_log.size()
+	log_table.set_log(sim.help_log)
 
 
 ## 設定パネルは画面の左端に付けるので、中央寄せのずらし（_layer）は使わない
@@ -461,6 +580,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			_on_pseudon_tap()
 		else:
 			_set_settings_open(not settings_open)
+		return
+	if desk.hit(p):
+		_set_log_open(not log_open)
 		return
 	if berry_box.hit(p):
 		if not had_popup or box_popup.get_meta("kind", -1) != StorageBox.Kind.BERRY:
@@ -708,3 +830,5 @@ func _refresh() -> void:
 		sim.held_count(), sim.params.carry_limit(), sim.skill_stock, sim.params.max_skill_stock, stock_note,
 		maxi(1, sim.params.skill_ceiling + 1 - sim.skill_miss)])
 	status_label.text = "\n".join(lines)
+	if log_open:
+		_update_log()

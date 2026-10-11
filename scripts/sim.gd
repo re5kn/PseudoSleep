@@ -41,6 +41,11 @@ var skill_miss := 0
 ## ストックのうち天井で発動した分
 var ceiling_stock := 0
 var totals := {}
+## おてつだい1回ごとの記録（リセットまで）。要素は
+## {"t": 終わった時刻(秒), "id": 獲得したもの（いつのまに育成なら ""）, "amount": 獲得数, "skill": Skill}
+var help_log: Array[Dictionary] = []
+
+enum Skill { NONE, HIT, CEILING }
 
 
 func _init(p: Params = null) -> void:
@@ -60,6 +65,7 @@ func reset() -> void:
 	skill_miss = 0
 	ceiling_stock = 0
 	totals = new_stats()
+	help_log.clear()
 	next_help_at = help_interval_at(0.0)
 
 
@@ -112,36 +118,42 @@ func advance(seconds: float) -> Dictionary:
 	var end := elapsed_sec + seconds
 	while next_help_at <= end + 1e-6:
 		var t := next_help_at
-		_do_help(r)
+		_do_help(r, t)
 		next_help_at = t + help_interval_at(t)
 	elapsed_sec = end
 	_accumulate(r)
 	return r
 
 
-func _do_help(r: Dictionary) -> void:
+func _do_help(r: Dictionary, t: float) -> void:
 	r["helps"] += 1
 	var held := held_count()
 	var limit := params.carry_limit()
 	if held >= limit:
 		r["full_helps"] += 1
 		r["auto_fed"] += params.berry_amount()
+		help_log.append({"t": t, "id": "", "amount": 0, "skill": Skill.NONE})
 		return
 	var room := limit - held
 	var slots := params.active_ingredients()
+	var id: String
+	var got: int
 	if not slots.is_empty() and rng.randf() < params.ingredient_chance():
 		var ing: Dictionary = slots[rng.randi_range(0, slots.size() - 1)]
 		r["ingredient_helps"] += 1
-		_gain(r, ing["id"], ing["amount"], room)
+		id = ing["id"]
+		got = _gain(r, id, ing["amount"], room)
 	else:
 		r["berry_helps"] += 1
-		_gain(r, params.berry["id"], params.berry_amount(), room)
-	_skill_lottery(r)
+		id = params.berry["id"]
+		got = _gain(r, id, params.berry_amount(), room)
+	var skill := _skill_lottery(r)
+	help_log.append({"t": t, "id": id, "amount": got, "skill": skill})
 
 
-func _skill_lottery(r: Dictionary) -> void:
+func _skill_lottery(r: Dictionary) -> Skill:
 	if skill_stock >= params.max_skill_stock:
-		return
+		return Skill.NONE
 	var by_ceiling := skill_miss >= params.skill_ceiling
 	if rng.randf() < params.skill_chance() or by_ceiling:
 		r["skills"] += 1
@@ -150,16 +162,18 @@ func _skill_lottery(r: Dictionary) -> void:
 			ceiling_stock += 1
 		skill_stock += 1
 		skill_miss = 0
-	else:
-		skill_miss += 1
+		return Skill.CEILING if by_ceiling else Skill.HIT
+	skill_miss += 1
+	return Skill.NONE
 
 
-func _gain(r: Dictionary, id: String, amount: int, room: int) -> void:
+func _gain(r: Dictionary, id: String, amount: int, room: int) -> int:
 	var got := mini(amount, room)
 	pending[id] = int(pending.get(id, 0)) + got
 	var items: Dictionary = r["items"]
 	items[id] = int(items.get(id, 0)) + got
 	r["carry_lost"] += amount - got
+	return got
 
 
 func _accumulate(r: Dictionary) -> void:

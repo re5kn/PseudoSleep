@@ -93,7 +93,7 @@ func _draw_icon(bob: float) -> void:
 
 func _draw_menu(bob: float) -> void:
 	var c := ICON_POS + Vector2(0, bob)
-	var oval := ItemArt.ellipse(c, ICON_RADIUS + 6, ICON_RADIUS - 2, 32)
+	var oval := ItemArt.rounded_rect(c, Vector2(ICON_RADIUS + 4, ICON_RADIUS - 6), 10)
 	draw_colored_polygon(oval, Color.WHITE)
 	ItemArt.outline(self, oval, Color("0d2738"), 3.0)
 	for i in 3:

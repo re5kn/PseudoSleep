@@ -8,10 +8,20 @@ enum Kind { BERRY, INGREDIENT }
 
 var kind: int = Kind.BERRY
 var label := ""
+var _t := 0.0
+
+
+func _process(delta: float) -> void:
+	# 名札をパチモンの「…」と同じ周期で上下に揺らす
+	_t += delta
+	queue_redraw()
+
+
+const TAG_POS := Vector2(0, -84)
 
 
 func hit(p: Vector2) -> bool:
-	return Rect2(global_position + Vector2(-62, -62), Vector2(124, 120)).has_point(p)
+	return Rect2(global_position + Vector2(-80, -112), Vector2(160, 170)).has_point(p)
 
 
 func _draw() -> void:
@@ -20,9 +30,7 @@ func _draw() -> void:
 		_draw_crate()
 	else:
 		_draw_cooler()
-	var pos := Vector2(-60, 70)
-	draw_string_outline(FONT, pos, label, HORIZONTAL_ALIGNMENT_CENTER, 120, 17, 6, Color(1, 1, 1, 0.9))
-	draw_string(FONT, pos, label, HORIZONTAL_ALIGNMENT_CENTER, 120, 17, Color("5a4632"))
+	ItemArt.name_tag(self, TAG_POS + Vector2(0, sin(_t * 3.0) * 4.0), label, FONT)
 
 
 func _draw_crate() -> void:
