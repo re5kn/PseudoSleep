@@ -9,6 +9,7 @@ const FlyingItem = preload("res://scripts/flying_item.gd")
 const StorageBox = preload("res://scripts/storage_box.gd")
 const ItemIcon = preload("res://scripts/item_icon.gd")
 const SettingsPanel = preload("res://scripts/settings_panel.gd")
+const HelpLogTable = preload("res://scripts/help_log_table.gd")
 const FONT = preload("res://fonts/MPLUSRounded1c-Bold.ttf")
 
 const VIEW_SIZE := Vector2(720, 1280)
@@ -51,7 +52,12 @@ var pseudon: PseudonView
 var berry_box: StorageBox
 var ingredient_box: StorageBox
 var dim: ColorRect
+var hud: PanelContainer
 var hud_label: RichTextLabel
+var log_view: Control
+var log_title: Label
+var log_scroll: ScrollContainer
+var log_table: HelpLogTable
 var hours_label: Label
 var advance_button: Button
 var genki_button: Button
@@ -79,6 +85,7 @@ func _ready() -> void:
 	_build_field()
 	_build_panel()
 	_build_overlays()
+	_build_log_view()
 	_build_settings()
 	_refresh()
 	get_viewport().size_changed.connect(_center_layers)
@@ -144,7 +151,7 @@ func _build_field() -> void:
 	berry_box.position = BERRY_BOX_POS
 	field.add_child(berry_box)
 
-	var hud := PanelContainer.new()
+	hud = PanelContainer.new()
 	hud.theme = ui_theme
 	hud.position = Vector2(16, 16)
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -287,6 +294,60 @@ func _build_overlays() -> void:
 	blocker.visible = false
 	blocker.gui_input.connect(_on_blocker_input)
 	blocker_layer.add_child(blocker)
+
+
+## 画面上部の累計をタップすると開く、おてつだい1回ごとの記録
+func _build_log_view() -> void:
+	var layer := _layer(5)
+	log_view = ColorRect.new()
+	log_view.color = Color(0, 0, 0, 0.45)
+	log_view.size = VIEW_SIZE
+	log_view.mouse_filter = Control.MOUSE_FILTER_STOP
+	log_view.visible = false
+	# 枠の外をタップしても閉じる
+	log_view.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			_set_log_open(false))
+	layer.add_child(log_view)
+
+	var panel := PanelContainer.new()
+	panel.theme = ui_theme
+	panel.position = Vector2(32, 48)
+	panel.size = Vector2(VIEW_SIZE.x - 64, VIEW_SIZE.y - 96)
+	panel.add_theme_stylebox_override("panel", _style(CREAM, 28, 18))
+	log_view.add_child(panel)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	panel.add_child(v)
+
+	var top := HBoxContainer.new()
+	v.add_child(top)
+	log_title = _label("", 24)
+	log_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(log_title)
+	var close := _button("とじる", Color("ffe9bf"), TEXT_DARK)
+	close.add_theme_font_size_override("font_size", 18)
+	close.pressed.connect(_set_log_open.bind(false))
+	top.add_child(close)
+
+	v.add_child(HelpLogTable.new(true))
+	log_scroll = ScrollContainer.new()
+	log_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	log_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(log_scroll)
+	log_table = HelpLogTable.new()
+	log_table.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	log_scroll.add_child(log_table)
+	log_scroll.get_v_scroll_bar().value_changed.connect(func(_v: float) -> void: log_table.queue_redraw())
+	log_scroll.resized.connect(log_table.queue_redraw)
+
+
+func _set_log_open(open: bool) -> void:
+	log_view.visible = open
+	if open:
+		log_title.text = "おてつだいの記録（全%d回）" % sim.help_log.size()
+		log_table.set_log(sim.help_log)
+		log_scroll.scroll_vertical = 0
 
 
 ## 設定パネルは画面の左端に付けるので、中央寄せのずらし（_layer）は使わない
@@ -450,6 +511,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	swiped.clear()
 	var had_popup := box_popup.visible
 	_hide_box_popup()
+	if Rect2(hud.position, hud.size).has_point(p):
+		swiping = false
+		_set_log_open(true)
+		return
 	for id in piles:
 		if piles[id].hit(p):
 			swiped[id] = true
@@ -689,7 +754,7 @@ func _refresh() -> void:
 	for row in rows:
 		table += "[cell padding=0,0,16,0]%s[/cell][cell][right]%d回[/right][/cell][cell]%s[/cell]" % row
 	table += "[/table]"
-	hud_label.text = "%s（Lv.%d）\n経過 %s ・ げんき %s\n%s" % [
+	hud_label.text = "%s（Lv.%d）\n経過 %s ・ げんき %s\n%s\n[font_size=15][color=#a08c74]タップで1回ごとの記録[/color][/font_size]" % [
 		sim.params.pseudon_name, sim.params.level, _format_hours(sim.elapsed_sec), genki, table]
 
 	pseudon.show_icon = sim.has_icon()

@@ -210,6 +210,9 @@ func _test_skill_ceiling() -> void:
 	check(r["skills"] == 0, "タップ後も5回目までは発動しない (got %d)" % r["skills"])
 	r = s.advance(p.help_sec() * 0.45)
 	check(r["skills"] == 1, "タップ後はまた6回目で発動 (got %d)" % r["skills"])
+	var kinds := s.help_log.map(func(e: Dictionary) -> int: return e["skill"])
+	check(kinds.size() == 32 and kinds[5] == Sim.Skill.CEILING and kinds[31] == Sim.Skill.CEILING and kinds.count(Sim.Skill.CEILING) == 2
+		and kinds.count(Sim.Skill.HIT) == 0, "記録では6回目と32回目が天井 (%d件)" % kinds.size())
 
 
 ## ストック2: 1回目は天井で発動、そのあと不発カウントは0から数え直し、2回目は天井に届く前に通常の抽選で発動する
@@ -348,6 +351,15 @@ func _test_capacity() -> void:
 	var r2 := s.advance(3600.0 * 4)
 	check(r2["helps"] == r2["full_helps"], "残置中はすべていつのまに育成")
 	var t := s.totals
+	check(s.help_log.size() == t["helps"], "1回ごとの記録はおてつだい回数と同じ件数")
+	var full := s.help_log.filter(func(e: Dictionary) -> bool: return e["id"] == "")
+	check(full.size() == t["full_helps"], "記録のいつのまに育成の件数が合う")
+	var times := s.help_log.map(func(e: Dictionary) -> float: return e["t"])
+	var sorted := times.duplicate()
+	sorted.sort()
+	check(times == sorted and times[-1] <= s.elapsed_sec, "記録は時刻順")
+	s.reset()
+	check(s.help_log.is_empty(), "リセットで記録も消える")
 	check(t["helps"] == t["berry_helps"] + t["ingredient_helps"] + t["full_helps"],
 		"累計でおてつだい = きのみ + 食材 + いつのまに育成 (%d = %d + %d + %d)" % [
 			t["helps"], t["berry_helps"], t["ingredient_helps"], t["full_helps"]])
