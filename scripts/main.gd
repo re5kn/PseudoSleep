@@ -10,6 +10,7 @@ const StorageBox = preload("res://scripts/storage_box.gd")
 const ItemIcon = preload("res://scripts/item_icon.gd")
 const SettingsPanel = preload("res://scripts/settings_panel.gd")
 const HelpLogTable = preload("res://scripts/help_log_table.gd")
+const Desk = preload("res://scripts/desk.gd")
 const FONT = preload("res://fonts/MPLUSRounded1c-Bold.ttf")
 
 const VIEW_SIZE := Vector2(720, 1280)
@@ -19,6 +20,7 @@ const PILE_Y := 636.0
 const PILE_GAP := 100.0
 const BERRY_BOX_POS := Vector2(575, 745)
 const INGREDIENT_BOX_POS := Vector2(150, 735)
+const DESK_POS := Vector2(108, 528)
 const MIN_HOURS := 1
 const MAX_HOURS := 24
 const TOAST_SEC := 2.5
@@ -53,8 +55,8 @@ var actor_root: Node2D
 var pseudon: PseudonView
 var berry_box: StorageBox
 var ingredient_box: StorageBox
+var desk: Desk
 var dim: ColorRect
-var hud: PanelContainer
 var hud_label: RichTextLabel
 var log_panel: PanelContainer
 var log_scrim: ColorRect
@@ -167,13 +169,17 @@ func _build_field() -> void:
 	ingredient_box.position = INGREDIENT_BOX_POS
 	field.add_child(ingredient_box)
 
+	desk = Desk.new()
+	desk.position = DESK_POS
+	field.add_child(desk)
+
 	berry_box = StorageBox.new()
 	berry_box.kind = StorageBox.Kind.BERRY
 	berry_box.label = "きのみ収容箱"
 	berry_box.position = BERRY_BOX_POS
 	field.add_child(berry_box)
 
-	hud = PanelContainer.new()
+	var hud := PanelContainer.new()
 	hud.theme = ui_theme
 	hud.position = Vector2(16, 16)
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -318,7 +324,7 @@ func _build_overlays() -> void:
 	blocker_layer.add_child(blocker)
 
 
-## 画面上部の累計をタップすると、画面右からせり出す、おてつだい1回ごとの記録。
+## フィールドの机をタップすると、画面右からせり出す、おてつだい1回ごとの記録。
 ## 設定パネルと同じく中央寄せのずらし（_layer）は使わず、画面右端に付ける
 func _build_log_view() -> void:
 	var layer := CanvasLayer.new()
@@ -563,10 +569,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	swiped.clear()
 	var had_popup := box_popup.visible
 	_hide_box_popup()
-	if Rect2(hud.position, hud.size).has_point(p):
-		swiping = false
-		_set_log_open(not log_open)
-		return
 	for id in piles:
 		if piles[id].hit(p):
 			swiped[id] = true
@@ -578,6 +580,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			_on_pseudon_tap()
 		else:
 			_set_settings_open(not settings_open)
+		return
+	if desk.hit(p):
+		_set_log_open(not log_open)
 		return
 	if berry_box.hit(p):
 		if not had_popup or box_popup.get_meta("kind", -1) != StorageBox.Kind.BERRY:
@@ -796,8 +801,7 @@ func _refresh() -> void:
 		ceiling_hits = "[color=%s]%s[/color]" % [CEILING_COLOR.to_html(false), ceiling_hits]
 	# 「○回」の縦位置をそろえるため、項目名・回数・天井の3列の表にする
 	var rows := [
-		# 枠のどこをタップしても記録が開くが、ここをバッジにして目立たせる
-		["おてつだい回数", t["helps"], " [bgcolor=#f0a43a][color=#ffffff] 1回ごとの記録 %s [/color][/bgcolor]" % ("◀" if log_open else "▶")],
+		["おてつだい回数", t["helps"], ""],
 		["きのみ回数", t["berry_helps"], ""],
 		["食材回数", t["ingredient_helps"], ""],
 		["スキル回数", t["skills"], ceiling_hits],
