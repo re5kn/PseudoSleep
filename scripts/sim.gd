@@ -5,8 +5,8 @@ extends RefCounted
 ## - おてつだいの間隔 = おてつだい時間 × げんき補正（そのおてつだいを始めた時点のげんき）
 ##   おてつだい時間 = 基準時間 × レベル・せいかく・サブスキル・おやすみリボン補正 を小数点以下切り捨て（Params.help_sec）
 ## - 1回のおてつだいで、確率 p で食材（解放済みの枠から等確率）、1−p できのみ
-## - それとは独立に、確率 q でメインスキルが発動してストックに入る
-##   ストックが上限のあいだは抽選しない。抽選に 天井 回続けて外れると次は必ず発動する
+## - それとは独立に、確率 q でメインスキルが発動してストックに入る（上限を超えた分は消える）
+##   スキル発生天井（Params.skill_ceiling）はまだ計算に使わない
 ## - 所持数（パチモンが持っている分＋フィールドに残っている分）が最大所持数に達していると
 ##   「いつのまに育成」になり、きのみはカビゴンへ自動で渡され、食材もスキルも出ない
 ## - 途中まで進んだおてつだいは次の「すすめる」に持ち越す
@@ -36,10 +36,6 @@ var on_field := {}
 var berry_box := {}
 var ingredient_box := {}
 var skill_stock := 0
-## メインスキルの抽選に続けて外れた回数（天井用）
-var skill_miss := 0
-## ストックのうち天井で発動した分
-var ceiling_stock := 0
 var totals := {}
 
 
@@ -57,8 +53,6 @@ func reset() -> void:
 	berry_box.clear()
 	ingredient_box.clear()
 	skill_stock = 0
-	skill_miss = 0
-	ceiling_stock = 0
 	totals = new_stats()
 	next_help_at = help_interval_at(0.0)
 
@@ -70,7 +64,7 @@ func new_stats() -> Dictionary:
 		"berry_helps": 0,
 		"ingredient_helps": 0,
 		"skills": 0,
-		"skill_ceiling_hits": 0,
+		"skill_overflow": 0,
 		"full_helps": 0,
 		"auto_fed": 0,
 		"carry_lost": 0,
@@ -136,22 +130,12 @@ func _do_help(r: Dictionary) -> void:
 	else:
 		r["berry_helps"] += 1
 		_gain(r, params.berry["id"], params.berry_amount(), room)
-	_skill_lottery(r)
-
-
-func _skill_lottery(r: Dictionary) -> void:
-	if skill_stock >= params.max_skill_stock:
-		return
-	var by_ceiling := skill_miss >= params.skill_ceiling
-	if rng.randf() < params.skill_chance() or by_ceiling:
+	if rng.randf() < params.skill_chance():
 		r["skills"] += 1
-		if by_ceiling:
-			r["skill_ceiling_hits"] += 1
-			ceiling_stock += 1
-		skill_stock += 1
-		skill_miss = 0
-	else:
-		skill_miss += 1
+		if skill_stock < params.max_skill_stock:
+			skill_stock += 1
+		else:
+			r["skill_overflow"] += 1
 
 
 func _gain(r: Dictionary, id: String, amount: int, room: int) -> void:
@@ -199,19 +183,12 @@ func has_icon() -> bool:
 
 ## タップしたときの処理。持っている分をフィールドへ出し、スキルのストックを消費する。
 func drop() -> Dictionary:
-	var result := {"items": pending.duplicate(), "stock": skill_stock, "ceiling": ceiling_stock}
+	var result := {"items": pending.duplicate(), "stock": skill_stock}
 	for id in pending:
 		on_field[id] = int(on_field.get(id, 0)) + int(pending[id])
 	pending.clear()
 	skill_stock = 0
-	ceiling_stock = 0
 	return result
-
-
-## ストック上限を下げたとき、あふれた分を捨てる（天井で出た分は後から捨てる）
-func clamp_stock() -> void:
-	skill_stock = mini(skill_stock, params.max_skill_stock)
-	ceiling_stock = mini(ceiling_stock, skill_stock)
 
 
 func box_for(id: String) -> Dictionary:
