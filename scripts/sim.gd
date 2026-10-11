@@ -3,9 +3,10 @@ extends RefCounted
 ##
 ## 期待値ではなく、1回ごとに乱数で結果を決める。
 ## - おてつだいの間隔 = おてつだい時間 × げんき補正（そのおてつだいを始めた時点のげんき）
-##   おてつだい時間 = 基準時間 × レベル補正 を小数点以下切り捨て（Params.help_sec）
+##   おてつだい時間 = 基準時間 × レベル・せいかく・サブスキル・おやすみリボン補正 を小数点以下切り捨て（Params.help_sec）
 ## - 1回のおてつだいで、確率 p で食材（解放済みの枠から等確率）、1−p できのみ
 ## - それとは独立に、確率 q でメインスキルが発動してストックに入る（上限を超えた分は消える）
+##   スキル発生天井（Params.skill_ceiling）はまだ計算に使わない
 ## - 所持数（パチモンが持っている分＋フィールドに残っている分）が最大所持数に達していると
 ##   「いつのまに育成」になり、きのみはカビゴンへ自動で渡され、食材もスキルも出ない
 ## - 途中まで進んだおてつだいは次の「すすめる」に持ち越す
@@ -115,20 +116,21 @@ func advance(seconds: float) -> Dictionary:
 func _do_help(r: Dictionary) -> void:
 	r["helps"] += 1
 	var held := held_count()
-	if held >= params.max_carry:
+	var limit := params.carry_limit()
+	if held >= limit:
 		r["full_helps"] += 1
-		r["auto_fed"] += params.berries_per_help
+		r["auto_fed"] += params.berry_amount()
 		return
-	var room := params.max_carry - held
-	if rng.randf() < params.ingredient_prob:
-		var slot := rng.randi_range(0, params.ingredients.size() - 1)
-		var ing: Dictionary = params.ingredients[slot]
+	var room := limit - held
+	var slots := params.active_ingredients()
+	if not slots.is_empty() and rng.randf() < params.ingredient_chance():
+		var ing: Dictionary = slots[rng.randi_range(0, slots.size() - 1)]
 		r["ingredient_helps"] += 1
 		_gain(r, ing["id"], ing["amount"], room)
 	else:
 		r["berry_helps"] += 1
-		_gain(r, params.berry["id"], params.berries_per_help, room)
-	if rng.randf() < params.skill_prob:
+		_gain(r, params.berry["id"], params.berry_amount(), room)
+	if rng.randf() < params.skill_chance():
 		r["skills"] += 1
 		if skill_stock < params.max_skill_stock:
 			skill_stock += 1
@@ -171,7 +173,7 @@ func pending_count() -> int:
 
 
 func is_full() -> bool:
-	return held_count() >= params.max_carry
+	return held_count() >= params.carry_limit()
 
 
 ## パチモンの上にアイコンを出すかどうか。
