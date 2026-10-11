@@ -85,11 +85,7 @@ func _draw_row(i: int, y: float) -> void:
 
 ## パチモンの頭上に出る「!」と同じ形の小さな印
 func _exclaim(c: Vector2, fill: Color, mark: Color) -> void:
-	var burst := PackedVector2Array()
-	for k in 16:
-		var r := 18.0 if k % 2 == 0 else 13.0
-		var a := TAU * k / 16.0 - PI / 2
-		burst.append(c + Vector2(cos(a), sin(a)) * r)
+	var burst := ItemArt.burst(c, 16.5)
 	draw_colored_polygon(burst, fill)
 	ItemArt.outline(self, burst, CEILING_COLOR, 2.0)
 	draw_string(FONT, c + Vector2(-20, 8), "!", HORIZONTAL_ALIGNMENT_CENTER, 40, 24, mark)

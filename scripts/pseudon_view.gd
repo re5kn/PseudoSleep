@@ -109,11 +109,7 @@ func _draw_exclaims() -> void:
 	var text := "!".repeat(exclaim_count)
 	var stretch := 1.0 + 0.3 * (exclaim_count - 1)
 	draw_set_transform(Vector2(0, ICON_POS.y), 0.0, Vector2.ONE * exclaim_anim)
-	var burst := PackedVector2Array()
-	for k in 16:
-		var r := 30.0 if k % 2 == 0 else 21.0
-		var a := TAU * k / 16.0 - PI / 2
-		burst.append(Vector2(cos(a) * stretch, sin(a)) * r)
+	var burst := ItemArt.burst(Vector2.ZERO, 27.0, stretch)
 	draw_colored_polygon(burst, Color("ffd93b"))
 	ItemArt.outline(self, burst, Color("e2483d"), 3.0)
 	var w := 60.0 * exclaim_count
