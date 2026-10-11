@@ -121,7 +121,7 @@ func _draw_flower(p: Vector2, col: Color) -> void:
 func _draw_bed(p: Vector2) -> void:
 	# 左下が足元、右上が枕の斜め向き。L=長さ方向、W=幅方向、H=厚み
 	var L := Vector2(110, -45)
-	var W := Vector2(40, 17)
+	var W := Vector2(52, 22)
 	var H := Vector2(0, 16)
 	var a := p - L / 2 - W / 2
 	var b := a + W
@@ -156,11 +156,11 @@ func _draw_bed(p: Vector2) -> void:
 	var pillow := PackedVector2Array()
 	for i in 20:
 		var ang := TAU * i / 20.0
-		pillow.append(pc + W.normalized() * cos(ang) * 17 + L.normalized() * sin(ang) * 8)
+		pillow.append(pc + W.normalized() * cos(ang) * 22 + L.normalized() * sin(ang) * 8)
 	draw_colored_polygon(pillow, Color("ffffff"))
 	ItemArt.outline(self, pillow, Color("d8ccb4"), 1.5)
 	# 掛け布団（足元側を覆い、手前と足元に垂れる）
-	var k := 0.62
+	var k := 0.75
 	var bl_top := PackedVector2Array([a, b, b + L * k, a + L * k])
 	var bl_side := PackedVector2Array([b, b + L * k, b + L * k + H * 1.25, b + H * 1.25])
 	var bl_foot := PackedVector2Array([a, b, b + H * 1.25, a + H * 1.25])
