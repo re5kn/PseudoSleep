@@ -112,11 +112,9 @@ func _build() -> void:
 	var name_row := _row(v, "名前")
 	var name_edit := LineEdit.new()
 	name_edit.text = params.pseudon_name
-	name_edit.max_length = 20
+	name_edit.max_length = Params.NAME_MAX_WIDTH
 	name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	name_edit.text_changed.connect(func(t: String) -> void:
-		params.pseudon_name = t
-		changed.emit())
+	name_edit.text_changed.connect(_on_name_changed.bind(name_edit))
 	name_row.add_child(name_edit)
 
 	_section(v, "パラメータ")
@@ -158,6 +156,17 @@ func _build() -> void:
 	note.add_theme_color_override("font_color", TEXT_SUB)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(note)
+
+
+## 名前は全角6文字・半角12文字まで（全角2・半角1で数えて12まで）。超えた分は後ろから削る。
+func _on_name_changed(t: String, edit: LineEdit) -> void:
+	var clipped := Params.clip_name(t)
+	if clipped != t:
+		var caret := edit.caret_column
+		edit.text = clipped
+		edit.caret_column = mini(caret, clipped.length())
+	params.pseudon_name = clipped
+	changed.emit()
 
 
 func _section(parent: Control, text: String) -> Label:
