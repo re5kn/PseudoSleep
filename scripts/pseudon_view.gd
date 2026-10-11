@@ -1,5 +1,6 @@
 extends Node2D
 ## パチモンの見た目（images/pseudon.png のおばけ）。所持数があれば頭上にアイコン、スキル発動時は「!」を出す。
+## アイコンが出ていないとき（タップで設定パネルを開けるとき）は「…」の吹き出しを出す。
 
 const ItemArt = preload("res://scripts/item_art.gd")
 const FONT = preload("res://fonts/MPLUSRounded1c-Bold.ttf")
@@ -14,6 +15,8 @@ const ICON_POS := Vector2(0, -112)
 const ICON_RADIUS := 27.0
 
 var show_icon := false
+## 設定パネルを開ける印（「…」の吹き出し）を出すか
+var show_menu := false
 var icon_full := false
 var exclaim_count := 0
 var exclaim_anim := 0.0
@@ -36,7 +39,7 @@ func show_exclaims(n: int) -> void:
 func hit(p: Vector2) -> bool:
 	var local := p - global_position
 	var body := Vector2(local.x / (BODY_RX + 12), local.y / (BODY_RY + 12)).length() <= 1.0
-	var icon := show_icon and local.distance_to(ICON_POS + Vector2(0, -_float_y())) <= ICON_RADIUS + 12
+	var icon := (show_icon or show_menu) and local.distance_to(ICON_POS + Vector2(0, -_float_y())) <= ICON_RADIUS + 12
 	return body or icon
 
 
@@ -46,7 +49,7 @@ func _float_y() -> float:
 
 
 func _draw() -> void:
-	# ふわふわ浮いて、影は浮き上がるほど小さくなる。頭上のアイコンも体と一緒に動かし、間隔を一定に保つ
+	# ふわふわ浮いて、影は浮き上がるほど小さくなる。頭上のアイコンと「…」も体と一緒に動かし、間隔を一定に保つ
 	var float_y := _float_y()
 	var shadow_s := 1.0 - float_y / 60.0
 	draw_colored_polygon(ItemArt.ellipse(Vector2(0, BODY_RY + 8), BODY_RX * 0.8 * shadow_s, 12 * shadow_s), Color(0, 0, 0, 0.22))
@@ -55,6 +58,8 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	if show_icon:
 		_draw_icon(-float_y)
+	elif show_menu and exclaim_count == 0:
+		_draw_menu(-float_y)
 	if exclaim_count > 0:
 		_draw_exclaims()
 
@@ -77,6 +82,15 @@ func _draw_icon(bob: float) -> void:
 		var pos := c + Vector2(-40, -ICON_RADIUS - 8)
 		draw_string_outline(FONT, pos, "MAX", HORIZONTAL_ALIGNMENT_CENTER, 80, 18, 6, Color.WHITE)
 		draw_string(FONT, pos, "MAX", HORIZONTAL_ALIGNMENT_CENTER, 80, 18, border)
+
+
+func _draw_menu(bob: float) -> void:
+	var c := ICON_POS + Vector2(0, bob)
+	var oval := ItemArt.rounded_rect(c, Vector2(ICON_RADIUS + 4, ICON_RADIUS - 6), 10)
+	draw_colored_polygon(oval, Color.WHITE)
+	ItemArt.outline(self, oval, Color("0d2738"), 3.0)
+	for i in 3:
+		draw_circle(c + Vector2((i - 1) * 11, 0), 3.6, Color.BLACK)
 
 
 func _draw_exclaims() -> void:

@@ -3,9 +3,10 @@ extends RefCounted
 ##
 ## 期待値ではなく、1回ごとに乱数で結果を決める。
 ## - おてつだいの間隔 = おてつだい時間 × げんき補正（そのおてつだいを始めた時点のげんき）
-##   おてつだい時間 = 基準時間 × レベル補正 を小数点以下切り捨て（Params.help_sec）
+##   おてつだい時間 = 基準時間 × レベル・せいかく・サブスキル・おやすみリボン補正 を小数点以下切り捨て（Params.help_sec）
 ## - 1回のおてつだいで、確率 p で食材（解放済みの枠から等確率）、1−p できのみ
-## - それとは独立に、確率 q でメインスキルが発動してストックに入る（上限を超えた分は消える）
+## - それとは独立に、確率 q でメインスキルが発動してストックに入る
+##   ストックが上限のあいだは抽選しない。抽選に 天井 回続けて外れると次は必ず発動する
 ## - 所持数（パチモンが持っている分＋フィールドに残っている分）が最大所持数に達していると
 ##   「いつのまに育成」になり、きのみはカビゴンへ自動で渡され、食材もスキルも出ない
 ## - 途中まで進んだおてつだいは次の「すすめる」に持ち越す
@@ -35,7 +36,16 @@ var on_field := {}
 var berry_box := {}
 var ingredient_box := {}
 var skill_stock := 0
+## メインスキルの抽選に続けて外れた回数（天井用）
+var skill_miss := 0
+## ストックのうち天井で発動した分
+var ceiling_stock := 0
 var totals := {}
+## おてつだい1回ごとの記録（リセットまで）。要素は
+## {"t": 終わった時刻(秒), "id": 獲得したもの（いつのまに育成なら ""）, "amount": 獲得数, "skill": Skill}
+var help_log: Array[Dictionary] = []
+
+enum Skill { NONE, HIT, CEILING }
 
 
 func _init(p: Params = null) -> void:
@@ -52,7 +62,10 @@ func reset() -> void:
 	berry_box.clear()
 	ingredient_box.clear()
 	skill_stock = 0
+	skill_miss = 0
+	ceiling_stock = 0
 	totals = new_stats()
+	help_log.clear()
 	next_help_at = help_interval_at(0.0)
 
 
@@ -63,7 +76,7 @@ func new_stats() -> Dictionary:
 		"berry_helps": 0,
 		"ingredient_helps": 0,
 		"skills": 0,
-		"skill_overflow": 0,
+		"skill_ceiling_hits": 0,
 		"full_helps": 0,
 		"auto_fed": 0,
 		"carry_lost": 0,
@@ -105,43 +118,62 @@ func advance(seconds: float) -> Dictionary:
 	var end := elapsed_sec + seconds
 	while next_help_at <= end + 1e-6:
 		var t := next_help_at
-		_do_help(r)
+		_do_help(r, t)
 		next_help_at = t + help_interval_at(t)
 	elapsed_sec = end
 	_accumulate(r)
 	return r
 
 
-func _do_help(r: Dictionary) -> void:
+func _do_help(r: Dictionary, t: float) -> void:
 	r["helps"] += 1
 	var held := held_count()
-	if held >= params.max_carry:
+	var limit := params.carry_limit()
+	if held >= limit:
 		r["full_helps"] += 1
-		r["auto_fed"] += params.berries_per_help
+		r["auto_fed"] += params.berry_amount()
+		help_log.append({"t": t, "id": "", "amount": 0, "skill": Skill.NONE})
 		return
-	var room := params.max_carry - held
-	if rng.randf() < params.ingredient_prob:
-		var slot := rng.randi_range(0, params.ingredients.size() - 1)
-		var ing: Dictionary = params.ingredients[slot]
+	var room := limit - held
+	var slots := params.active_ingredients()
+	var id: String
+	var got: int
+	if not slots.is_empty() and rng.randf() < params.ingredient_chance():
+		var ing: Dictionary = slots[rng.randi_range(0, slots.size() - 1)]
 		r["ingredient_helps"] += 1
-		_gain(r, ing["id"], ing["amount"], room)
+		id = ing["id"]
+		got = _gain(r, id, ing["amount"], room)
 	else:
 		r["berry_helps"] += 1
-		_gain(r, params.berry["id"], params.berries_per_help, room)
-	if rng.randf() < params.skill_prob:
+		id = params.berry["id"]
+		got = _gain(r, id, params.berry_amount(), room)
+	var skill := _skill_lottery(r)
+	help_log.append({"t": t, "id": id, "amount": got, "skill": skill})
+
+
+func _skill_lottery(r: Dictionary) -> Skill:
+	if skill_stock >= params.max_skill_stock:
+		return Skill.NONE
+	var by_ceiling := skill_miss >= params.skill_ceiling
+	if rng.randf() < params.skill_chance() or by_ceiling:
 		r["skills"] += 1
-		if skill_stock < params.max_skill_stock:
-			skill_stock += 1
-		else:
-			r["skill_overflow"] += 1
+		if by_ceiling:
+			r["skill_ceiling_hits"] += 1
+			ceiling_stock += 1
+		skill_stock += 1
+		skill_miss = 0
+		return Skill.CEILING if by_ceiling else Skill.HIT
+	skill_miss += 1
+	return Skill.NONE
 
 
-func _gain(r: Dictionary, id: String, amount: int, room: int) -> void:
+func _gain(r: Dictionary, id: String, amount: int, room: int) -> int:
 	var got := mini(amount, room)
 	pending[id] = int(pending.get(id, 0)) + got
 	var items: Dictionary = r["items"]
 	items[id] = int(items.get(id, 0)) + got
 	r["carry_lost"] += amount - got
+	return got
 
 
 func _accumulate(r: Dictionary) -> void:
@@ -171,7 +203,7 @@ func pending_count() -> int:
 
 
 func is_full() -> bool:
-	return held_count() >= params.max_carry
+	return held_count() >= params.carry_limit()
 
 
 ## パチモンの上にアイコンを出すかどうか。
@@ -181,12 +213,19 @@ func has_icon() -> bool:
 
 ## タップしたときの処理。持っている分をフィールドへ出し、スキルのストックを消費する。
 func drop() -> Dictionary:
-	var result := {"items": pending.duplicate(), "stock": skill_stock}
+	var result := {"items": pending.duplicate(), "stock": skill_stock, "ceiling": ceiling_stock}
 	for id in pending:
 		on_field[id] = int(on_field.get(id, 0)) + int(pending[id])
 	pending.clear()
 	skill_stock = 0
+	ceiling_stock = 0
 	return result
+
+
+## ストック上限を下げたとき、あふれた分を捨てる（天井で出た分は後から捨てる）
+func clamp_stock() -> void:
+	skill_stock = mini(skill_stock, params.max_skill_stock)
+	ceiling_stock = mini(ceiling_stock, skill_stock)
 
 
 func box_for(id: String) -> Dictionary:

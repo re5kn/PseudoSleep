@@ -8,28 +8,38 @@ const ItemPile = preload("res://scripts/item_pile.gd")
 const FlyingItem = preload("res://scripts/flying_item.gd")
 const StorageBox = preload("res://scripts/storage_box.gd")
 const ItemIcon = preload("res://scripts/item_icon.gd")
+const SettingsPanel = preload("res://scripts/settings_panel.gd")
+const HelpLogTable = preload("res://scripts/help_log_table.gd")
+const Desk = preload("res://scripts/desk.gd")
 const FONT = preload("res://fonts/MPLUSRounded1c-Bold.ttf")
 
 const VIEW_SIZE := Vector2(720, 1280)
 const FIELD_HEIGHT := 1040.0
 const PSEUDON_POS := Vector2(360, 505)
 const PILE_Y := 636.0
-const PILE_GAP := 100.0
-const BERRY_BOX_POS := Vector2(575, 745)
-const INGREDIENT_BOX_POS := Vector2(150, 735)
+const PILE_GAP := 88.0
+const BERRY_BOX_POS := Vector2(584, 772)
+const INGREDIENT_BOX_POS := Vector2(138, 764)
+const DESK_POS := Vector2(606, 560)
 const MIN_HOURS := 1
 const MAX_HOURS := 24
 const TOAST_SEC := 2.5
 const CUTIN_PAUSE_SEC := 0.9
 const REPEAT_DELAY_SEC := 0.4
 const REPEAT_INTERVAL_SEC := 0.08
+## 設定パネルの幅。ブラウザの幅が VIEW_SIZE.x + これ以上あれば、フィールドと並べて表示する
+const SETTINGS_W := 470.0
+const SETTINGS_SLIDE_SEC := 0.22
+## おてつだいの記録パネルの幅（画面右からせり出す）
+const LOG_W := 540.0
 
 const TEXT_DARK := Color("5a4632")
 const CREAM := Color("fff7e6")
+## 天井で出たスキルの目印の色
+const CEILING_COLOR := Color("e2483d")
 
 var sim: Sim
 var hours := 3
-var last_result := {}
 var piles := {}
 var cutin_active := false
 var cutin_closable := false
@@ -45,13 +55,21 @@ var actor_root: Node2D
 var pseudon: PseudonView
 var berry_box: StorageBox
 var ingredient_box: StorageBox
+var desk: Desk
 var dim: ColorRect
-var hud_label: Label
+var hud_label: RichTextLabel
+var log_panel: PanelContainer
+var log_scrim: ColorRect
+var log_open := false
+var log_slide := 0.0
+var log_tween: Tween
+var log_title: Label
+var log_scroll: ScrollContainer
+var log_table: HelpLogTable
 var hours_label: Label
 var advance_button: Button
 var genki_button: Button
-var stock_button: Button
-var status_label: Label
+var status_label: RichTextLabel
 var toast_box: VBoxContainer
 var box_popup: PanelContainer
 var box_popup_label: Label
@@ -59,6 +77,12 @@ var box_popup_timer: SceneTreeTimer
 var bubble: PanelContainer
 var bubble_label: Label
 var blocker: Control
+var settings: SettingsPanel
+var settings_scrim: ColorRect
+var settings_open := false
+## 0＝閉じている、1＝せり出しきった状態
+var settings_slide := 0.0
+var settings_tween: Tween
 
 
 func _ready() -> void:
@@ -69,6 +93,8 @@ func _ready() -> void:
 	_build_field()
 	_build_panel()
 	_build_overlays()
+	_build_log_view()
+	_build_settings()
 	_refresh()
 	get_viewport().size_changed.connect(_center_layers)
 	_center_layers()
@@ -76,11 +102,47 @@ func _ready() -> void:
 
 # ---------------------------------------------------------------- 画面の組み立て
 
-## 横（縦長の端末では縦）に余った領域は背景色のまま、将来の操作UI用に空けておく
+## 縦長の画面を中央に置く。横に余った領域は背景色のまま。
+## 幅が広く設定パネル（左）・記録パネル（右）を並べて出せるときは、残りの幅の中央にフィールドを置く。
 func _center_layers() -> void:
-	var offset := ((get_viewport().get_visible_rect().size - VIEW_SIZE) / 2).floor()
+	var view := get_viewport().get_visible_rect().size
+	var offset := ((view - VIEW_SIZE) / 2).floor()
+	var wide := _is_wide()
+	if wide:
+		var left := SETTINGS_W * settings_slide
+		var right := LOG_W * log_slide
+		offset.x = floorf(left + (view.x - left - right - VIEW_SIZE.x) / 2)
 	for layer in layers:
 		layer.offset = offset
+	if settings != null:
+		settings.size = Vector2(_side_width(SETTINGS_W), view.y)
+		settings.position = Vector2(-settings.size.x * (1.0 - settings_slide), 0)
+		settings.visible = settings_slide > 0.0
+		settings_scrim.size = view
+		settings_scrim.visible = settings_open and not wide
+		settings_scrim.modulate.a = settings_slide
+	if log_panel != null:
+		log_panel.size = Vector2(_side_width(LOG_W), view.y)
+		log_panel.position = Vector2(view.x - log_panel.size.x * log_slide, 0)
+		log_panel.visible = log_slide > 0.0
+		log_scrim.size = view
+		log_scrim.visible = log_open and not wide
+		log_scrim.modulate.a = log_slide
+
+
+## 開いているパネルをすべてフィールドの横に並べられるか
+func _is_wide() -> bool:
+	var need := VIEW_SIZE.x
+	if settings_open:
+		need += SETTINGS_W
+	if log_open:
+		need += LOG_W
+	return get_viewport().get_visible_rect().size.x >= need
+
+
+func _side_width(w: float) -> float:
+	# 狭い画面では外側をタップして閉じられるよう、反対側に少し隙間を残す
+	return minf(w, get_viewport().get_visible_rect().size.x - 80.0)
 
 
 func _layer(n: int) -> CanvasLayer:
@@ -107,6 +169,10 @@ func _build_field() -> void:
 	ingredient_box.position = INGREDIENT_BOX_POS
 	field.add_child(ingredient_box)
 
+	desk = Desk.new()
+	desk.position = DESK_POS
+	field.add_child(desk)
+
 	berry_box = StorageBox.new()
 	berry_box.kind = StorageBox.Kind.BERRY
 	berry_box.label = "きのみ収容箱"
@@ -118,7 +184,14 @@ func _build_field() -> void:
 	hud.position = Vector2(16, 16)
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud.add_theme_stylebox_override("panel", _style(Color(1, 1, 1, 0.85), 20, 8))
-	hud_label = _label("", 20)
+	hud_label = RichTextLabel.new()
+	hud_label.bbcode_enabled = true
+	hud_label.fit_content = true
+	hud_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	hud_label.scroll_active = false
+	hud_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hud_label.add_theme_font_size_override("normal_font_size", 20)
+	hud_label.add_theme_color_override("default_color", TEXT_DARK)
 	hud.add_child(hud_label)
 	field.add_child(hud)
 
@@ -186,16 +259,17 @@ func _build_panel() -> void:
 	genki_button = _toggle()
 	genki_button.pressed.connect(_on_genki_toggled)
 	row2.add_child(genki_button)
-	stock_button = _toggle()
-	stock_button.pressed.connect(_on_stock_toggled)
-	row2.add_child(stock_button)
 	var reset := _button("リセット", Color("e5534b"), Color.WHITE)
 	reset.add_theme_font_size_override("font_size", 18)
 	reset.pressed.connect(_on_reset)
 	row2.add_child(reset)
 
-	status_label = _label("", 17)
-	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	status_label = RichTextLabel.new()
+	status_label.bbcode_enabled = true
+	status_label.scroll_active = false
+	status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	status_label.add_theme_font_size_override("normal_font_size", 17)
+	status_label.add_theme_color_override("default_color", TEXT_DARK)
 	status_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(status_label)
 
@@ -248,6 +322,138 @@ func _build_overlays() -> void:
 	blocker.visible = false
 	blocker.gui_input.connect(_on_blocker_input)
 	blocker_layer.add_child(blocker)
+
+
+## フィールドの机をタップすると、画面右からせり出す、おてつだい1回ごとの記録。
+## 設定パネルと同じく中央寄せのずらし（_layer）は使わず、画面右端に付ける
+func _build_log_view() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 7
+	add_child(layer)
+	# 狭い画面ではパネルがフィールドに重なる。外側のタップはここで受けて閉じる
+	log_scrim = ColorRect.new()
+	log_scrim.color = Color(0, 0, 0, 0.35)
+	log_scrim.visible = false
+	log_scrim.mouse_filter = Control.MOUSE_FILTER_STOP
+	log_scrim.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed:
+			_set_log_open(false))
+	layer.add_child(log_scrim)
+
+	log_panel = PanelContainer.new()
+	log_panel.theme = ui_theme
+	log_panel.visible = false
+	var sb := _style(CREAM, 0, 18)
+	sb.content_margin_top = 16
+	sb.content_margin_bottom = 16
+	sb.corner_radius_top_left = 28
+	sb.corner_radius_bottom_left = 28
+	sb.border_width_left = 4
+	sb.border_color = Color("e6cf9f")
+	sb.shadow_color = Color(0, 0, 0, 0.35)
+	sb.shadow_size = 12
+	log_panel.add_theme_stylebox_override("panel", sb)
+	layer.add_child(log_panel)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	log_panel.add_child(v)
+
+	var top := HBoxContainer.new()
+	v.add_child(top)
+	log_title = _label("", 24)
+	log_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(log_title)
+	var close := _button("×", Color("ffe9bf"), TEXT_DARK)
+	close.custom_minimum_size = Vector2(56, 56)
+	close.add_theme_font_size_override("font_size", 28)
+	close.pressed.connect(_set_log_open.bind(false))
+	top.add_child(close)
+
+	v.add_child(HelpLogTable.new(true))
+	log_scroll = ScrollContainer.new()
+	log_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	log_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(log_scroll)
+	log_table = HelpLogTable.new()
+	log_table.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	log_scroll.add_child(log_table)
+	log_scroll.get_v_scroll_bar().value_changed.connect(func(_v: float) -> void: log_table.queue_redraw())
+	log_scroll.resized.connect(log_table.queue_redraw)
+
+
+func _set_log_open(open: bool) -> void:
+	if open == log_open:
+		return
+	log_open = open
+	_refresh()
+	if open:
+		_update_log()
+		log_scroll.scroll_vertical = 0
+	if log_tween != null:
+		log_tween.kill()
+	log_tween = create_tween()
+	log_tween.tween_method(_set_log_slide, log_slide, 1.0 if open else 0.0, SETTINGS_SLIDE_SEC) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_center_layers()
+
+
+func _set_log_slide(t: float) -> void:
+	log_slide = t
+	_center_layers()
+
+
+## 開いたままでも「すすめる」やリセットに合わせて記録を更新する
+func _update_log() -> void:
+	log_title.text = "おてつだいの記録（全%d回）" % sim.help_log.size()
+	log_table.set_log(sim.help_log)
+
+
+## 設定パネルは画面の左端に付けるので、中央寄せのずらし（_layer）は使わない
+func _build_settings() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 6
+	add_child(layer)
+	# 狭い画面ではパネルがフィールドに重なる。外側のタップはここで受けて閉じる
+	settings_scrim = ColorRect.new()
+	settings_scrim.color = Color(0, 0, 0, 0.35)
+	settings_scrim.visible = false
+	settings_scrim.mouse_filter = Control.MOUSE_FILTER_STOP
+	settings_scrim.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed:
+			_set_settings_open(false))
+	layer.add_child(settings_scrim)
+	settings = SettingsPanel.new()
+	settings.setup(sim.params, ui_theme)
+	settings.visible = false
+	settings.changed.connect(_on_params_changed)
+	settings.close_requested.connect(_set_settings_open.bind(false))
+	layer.add_child(settings)
+
+
+func _set_settings_open(open: bool) -> void:
+	if open == settings_open:
+		return
+	settings_open = open
+	_refresh()
+	if not open:
+		# 入力途中の数値を確定させる
+		get_viewport().gui_release_focus()
+	if settings_tween != null:
+		settings_tween.kill()
+	settings_tween = create_tween()
+	settings_tween.tween_method(_set_settings_slide, settings_slide, 1.0 if open else 0.0, SETTINGS_SLIDE_SEC) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_center_layers()
+
+
+func _set_settings_slide(t: float) -> void:
+	settings_slide = t
+	_center_layers()
+
+
+func _on_params_changed() -> void:
+	sim.clamp_stock()
+	_refresh()
 
 
 func _style(color: Color, radius: int, pad: float) -> StyleBoxFlat:
@@ -319,7 +525,7 @@ func _on_advance() -> void:
 	if cutin_active:
 		return
 	_hide_box_popup()
-	last_result = sim.advance(hours * 3600.0)
+	sim.advance(hours * 3600.0)
 	_refresh()
 
 
@@ -329,17 +535,10 @@ func _on_genki_toggled() -> void:
 	_refresh()
 
 
-func _on_stock_toggled() -> void:
-	sim.params.max_skill_stock = 2 if sim.params.max_skill_stock == 1 else 1
-	sim.skill_stock = mini(sim.skill_stock, sim.params.max_skill_stock)
-	_refresh()
-
-
 func _on_reset() -> void:
 	if cutin_active:
 		return
 	sim.reset()
-	last_result = {}
 	for id in piles:
 		piles[id].queue_free()
 	piles.clear()
@@ -362,6 +561,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if p.y > FIELD_HEIGHT or cutin_active:
 		return
 	get_viewport().set_input_as_handled()
+	# 設定パネルの入力欄を編集中なら確定させる
+	get_viewport().gui_release_focus()
 	# 押したままフィールド上をなぞると、通った山を回収する
 	swiping = true
 	swipe_last = p
@@ -373,8 +574,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			swiped[id] = true
 			_collect(id)
 			return
-	if pseudon.hit(p) and sim.has_icon():
-		_on_pseudon_tap()
+	if pseudon.hit(p):
+		# アイコンが出ていなければ設定パネルを開け閉めする
+		if sim.has_icon():
+			_on_pseudon_tap()
+		else:
+			_set_settings_open(not settings_open)
+		return
+	if desk.hit(p):
+		_set_log_open(not log_open)
 		return
 	if berry_box.hit(p):
 		if not had_popup or box_popup.get_meta("kind", -1) != StorageBox.Kind.BERRY:
@@ -413,7 +621,7 @@ func _on_pseudon_tap() -> void:
 	var stock: int = result["stock"]
 	_spawn_drops(result["items"])
 	if stock > 0:
-		_start_cutin(stock)
+		_start_cutin(stock, result["ceiling"])
 	_refresh()
 
 
@@ -492,7 +700,7 @@ func _arc(from: Vector2, to: Vector2, t: float) -> Vector2:
 
 # ---------------------------------------------------------------- メインスキルのカットイン
 
-func _start_cutin(stock: int) -> void:
+func _start_cutin(stock: int, by_ceiling: int) -> void:
 	cutin_active = true
 	cutin_closable = false
 	_hide_box_popup()
@@ -502,7 +710,11 @@ func _start_cutin(stock: int) -> void:
 	await get_tree().create_timer(CUTIN_PAUSE_SEC).timeout
 	if not cutin_active:
 		return
-	bubble_label.text = "メインスキルが発動した！\nストック %d回分\n\n（タップでとじる）" % stock
+	var lines := PackedStringArray(["%sのメインスキル！" % sim.params.pseudon_name])
+	if by_ceiling > 0:
+		lines.append("スキル天井をたたいた！")
+	lines.append("肌のツヤが%dポイントアップ！" % stock)
+	bubble_label.text = "\n".join(lines)
 	bubble.visible = true
 	bubble.scale = Vector2(0.6, 0.6)
 	create_tween().tween_property(bubble, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -581,28 +793,42 @@ func _refresh() -> void:
 	hours_label.text = "%d時間" % hours
 	advance_button.text = "%d時間分すすめる" % hours
 	genki_button.text = "げんき：81以上で固定" if sim.genki_mode == Sim.GenkiMode.ALWAYS_HIGH else "げんき：100から減少"
-	stock_button.text = "ストック上限：%d" % sim.params.max_skill_stock
 	var genki := "81以上" if sim.genki_mode == Sim.GenkiMode.ALWAYS_HIGH else str(sim.genki_at(sim.elapsed_sec))
-	hud_label.text = "経過 %s ・ げんき %s" % [_format_hours(sim.elapsed_sec), genki]
+	# おてつだいの累計（リセットで 0 に戻る）
+	var t := sim.totals
+	var ceiling_hits := "（天井%d）" % t["skill_ceiling_hits"]
+	if t["skill_ceiling_hits"] > 0:
+		ceiling_hits = "[color=%s]%s[/color]" % [CEILING_COLOR.to_html(false), ceiling_hits]
+	# 「○回」の縦位置をそろえるため、項目名・回数・天井の3列の表にする
+	var rows := [
+		["おてつだい回数", t["helps"], ""],
+		["きのみ回数", t["berry_helps"], ""],
+		["食材回数", t["ingredient_helps"], ""],
+		["スキル回数", t["skills"], ceiling_hits],
+		["いつのまに育成回数", t["full_helps"], ""],
+	]
+	var table := "[table=3]"
+	for row in rows:
+		table += "[cell padding=0,0,16,0]%s[/cell][cell][right]%d回[/right][/cell][cell]%s[/cell]" % row
+	table += "[/table]"
+	hud_label.text = "%s（Lv.%d）\n経過 %s ・ げんき %s\n%s" % [
+		sim.params.pseudon_name, sim.params.level, _format_hours(sim.elapsed_sec), genki, table]
 
 	pseudon.show_icon = sim.has_icon()
+	pseudon.show_menu = not pseudon.show_icon and not settings_open
 	pseudon.icon_full = sim.is_full()
 
 	var lines: Array[String] = []
-	if last_result.is_empty():
+	if sim.elapsed_sec == 0.0:
 		lines.append("「すすめる」でおてつだいを進めます。")
 		lines.append("パチモンのアイコンをタップすると結果が出ます。")
-	else:
-		var r := last_result
-		lines.append("前回%d時間：おてつだい%d回（きのみ%d・食材%d）スキル%d回" % [
-			int(r["seconds"] / 3600.0), r["helps"], r["berry_helps"], r["ingredient_helps"], r["skills"]])
-		var parts: Array[String] = []
-		for id in sim.params.item_ids():
-			parts.append("%s %d" % [sim.params.item_name(id), int(r["items"].get(id, 0))])
-		var extra := ""
-		if r["full_helps"] > 0:
-			extra = "　いつのまに育成%d回" % r["full_helps"]
-		lines.append("獲得：" + "・".join(parts) + extra)
-	lines.append("所持 %d/%d　スキルストック %d/%d" % [
-		sim.held_count(), sim.params.max_carry, sim.skill_stock, sim.params.max_skill_stock])
+	var stock_note := ""
+	if sim.ceiling_stock > 0:
+		stock_note = " [bgcolor=%s][color=#ffffff] 天井%s [/color][/bgcolor]" % [
+			CEILING_COLOR.to_html(false), "" if sim.ceiling_stock == sim.skill_stock else "×%d" % sim.ceiling_stock]
+	lines.append("所持 %d/%d　スキルストック %d/%d%s　スキル天井まで あと%d回" % [
+		sim.held_count(), sim.params.carry_limit(), sim.skill_stock, sim.params.max_skill_stock, stock_note,
+		maxi(1, sim.params.skill_ceiling + 1 - sim.skill_miss)])
 	status_label.text = "\n".join(lines)
+	if log_open:
+		_update_log()
