@@ -130,8 +130,9 @@ func _draw_bed(p: Vector2) -> void:
 	var line := Color("a8794a")
 	var shadow := PackedVector2Array([a + H * 2.6 + Vector2(-6, 0), b + H * 2.6 + Vector2(0, 6), c + H * 2.6 + Vector2(8, 4), d + H * 2.6 + Vector2(6, -4)])
 	draw_colored_polygon(shadow, Color(0, 0, 0, 0.12))
-	for q in [a, b, c]:
-		draw_rect(Rect2(q + H + Vector2(-3, -2), Vector2(6, 13)), Color("b38a55"))
+	# 足は影の位置（H * 2.6）まで届く。頭側の2本はヘッドボードの下から出る
+	for q in [d, a, c, b]:
+		draw_rect(Rect2(q + H + Vector2(-3, -2), Vector2(6, H.y * 1.6 + 2)), Color("b38a55"))
 	# ヘッドボード（上が丸い板）
 	var head := PackedVector2Array([c + H * 1.6, d + H * 1.6])
 	for i in 13:
