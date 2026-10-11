@@ -347,6 +347,10 @@ func _test_capacity() -> void:
 	check(s.held_count() == 25, "フィールドに残した分も所持数に入る")
 	var r2 := s.advance(3600.0 * 4)
 	check(r2["helps"] == r2["full_helps"], "残置中はすべていつのまに育成")
+	var t := s.totals
+	check(t["helps"] == t["berry_helps"] + t["ingredient_helps"] + t["full_helps"],
+		"累計でおてつだい = きのみ + 食材 + いつのまに育成 (%d = %d + %d + %d)" % [
+			t["helps"], t["berry_helps"], t["ingredient_helps"], t["full_helps"]])
 	for id in s.on_field.keys():
 		s.collect(id)
 	check(s.held_count() == 0, "回収すると所持数0")

@@ -676,9 +676,9 @@ func _refresh() -> void:
 	var ceiling_hits := "うち天井%d回" % t["skill_ceiling_hits"]
 	if t["skill_ceiling_hits"] > 0:
 		ceiling_hits = "[color=%s]%s[/color]" % [CEILING_COLOR.to_html(false), ceiling_hits]
-	hud_label.text = "%s（Lv.%d）\n経過 %s ・ げんき %s\nおてつだい回数：%d回\nきのみ回数：%d回\n食材回数：%d回\nスキル回数：%d回（%s）" % [
+	hud_label.text = "%s（Lv.%d）\n経過 %s ・ げんき %s\nおてつだい回数：%d回\nきのみ回数：%d回\n食材回数：%d回\nスキル回数：%d回（%s）\nいつのまに育成回数：%d回" % [
 		sim.params.pseudon_name, sim.params.level, _format_hours(sim.elapsed_sec), genki,
-		t["helps"], t["berry_helps"], t["ingredient_helps"], t["skills"], ceiling_hits]
+		t["helps"], t["berry_helps"], t["ingredient_helps"], t["skills"], ceiling_hits, t["full_helps"]]
 
 	pseudon.show_icon = sim.has_icon()
 	pseudon.show_menu = not pseudon.show_icon and not settings_open
