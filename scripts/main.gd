@@ -66,7 +66,7 @@ var storage_box: StorageBox
 var desk: Desk
 var clock: FieldClock
 var phase_tint: ColorRect
-var phase := FieldClock.Phase.DAY
+var phase := FieldClock.phase_at(FieldClock.START_SEC)
 var phase_tween: Tween
 var dim: ColorRect
 var hud_label: RichTextLabel

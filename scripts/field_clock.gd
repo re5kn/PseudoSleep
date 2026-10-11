@@ -5,8 +5,10 @@ extends Node2D
 enum Phase { DAY, EVENING, NIGHT }
 
 const DAY_SEC := 86400.0
-## 起動時・リセット時の時刻（朝7:00）
-const START_SEC := 7 * 3600.0
+## 起動時・リセット時の時刻（朝4:00）
+const START_SEC := 4 * 3600.0
+## 日付が変わる時刻（朝4:00）
+const DAY_CHANGE_SEC := 4 * 3600.0
 ## 昼 7:00〜16:00、夕方 16:00〜18:00、夜 18:00〜翌7:00
 const DAY_START_SEC := 7 * 3600.0
 const EVENING_START_SEC := 16 * 3600.0
@@ -23,7 +25,7 @@ const RIM_DARK := Color("a8794a")
 const HAND := Color("5a4632")
 const MINUTE_HAND := Color("7a5c40")
 
-## 時計に表示している時刻（起動からの通算秒。7:00 起点）
+## 時計に表示している時刻（初日の 0:00 からの通算秒）
 var shown_sec := START_SEC:
 	set(v):
 		shown_sec = v
@@ -41,9 +43,9 @@ static func time_of_day(sec: float) -> float:
 	return fposmod(sec, DAY_SEC)
 
 
-## 何日目か（初日の 7:00 からが1日目、0:00 で日付が変わる）
+## 何日目か（朝4:00 で日付が変わる。初日の 4:00 からが1日目）
 static func day_number(sec: float) -> int:
-	return int(floor(sec / DAY_SEC)) + 1
+	return int(floor((sec - DAY_CHANGE_SEC) / DAY_SEC)) + 1
 
 
 ## リセットからの経過秒を「n日目」と「H:MM」にする

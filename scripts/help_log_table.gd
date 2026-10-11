@@ -69,7 +69,7 @@ func _draw_row(i: int, y: float) -> void:
 	if i % 2 == 1:
 		draw_rect(Rect2(0, y, size.x, ROW_H), STRIPE)
 	_text(str(i + 1), COL_K, y, HORIZONTAL_ALIGNMENT_RIGHT, TEXT_DARK)
-	# 時計と同じ時刻（朝7:00 始まり）で出す
+	# 時計と同じ時刻（朝4:00 始まり）で出す
 	var when := FieldClock.day_and_clock(e["t"])
 	_text("%d日目" % when[0], COL_DAY, y, HORIZONTAL_ALIGNMENT_CENTER, TEXT_DARK)
 	_text(when[1], COL_TIME, y, HORIZONTAL_ALIGNMENT_CENTER, TEXT_DARK)
