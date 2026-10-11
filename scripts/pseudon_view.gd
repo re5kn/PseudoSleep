@@ -11,7 +11,8 @@ const BODY_RY := 56.0
 ## 画像は高さ SPRITE_HEIGHT で、体の中心より少し上に置く
 const SPRITE_HEIGHT := 190.0
 const SPRITE_CENTER := Vector2(0, -8)
-const ICON_POS := Vector2(0, -112)
+## 頭上の印（アイコン・「…」・「!」）は画像の上端（-103）よりしっぽ込みで上に出す
+const ICON_POS := Vector2(0, -152)
 const ICON_RADIUS := 27.0
 
 var show_icon := false
