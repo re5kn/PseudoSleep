@@ -37,8 +37,8 @@ const TEXT_DARK := Color("5a4632")
 const CREAM := Color("fff7e6")
 ## 天井で出たスキルの目印の色
 const CEILING_COLOR := Color("e2483d")
-## 時計の中心（フィールド左上）
-const CLOCK_POS := Vector2(70, 70)
+## 時計の中心（フィールド右上）
+const CLOCK_POS := Vector2(VIEW_SIZE.x - 70, 70)
 ## 昼・夕方・夜にフィールド背景へ重ねる色（昼は重ねない）
 const PHASE_TINTS := {
 	FieldClock.Phase.DAY: Color(1, 0.6, 0.25, 0.0),
@@ -197,7 +197,7 @@ func _build_field() -> void:
 
 	var hud := PanelContainer.new()
 	hud.theme = ui_theme
-	hud.position = Vector2(CLOCK_POS.x + FieldClock.RADIUS + 14, 16)
+	hud.position = Vector2(16, 16)
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud.add_theme_stylebox_override("panel", _style(Color(1, 1, 1, 0.85), 20, 8))
 	hud_label = RichTextLabel.new()
@@ -295,7 +295,8 @@ func _build_overlays() -> void:
 
 	toast_box = VBoxContainer.new()
 	toast_box.theme = ui_theme
-	toast_box.position = Vector2(VIEW_SIZE.x - 236, 84)
+	# 取得の表示は右上の時計の下に出す
+	toast_box.position = Vector2(VIEW_SIZE.x - 236, CLOCK_POS.y + FieldClock.RADIUS + 14)
 	toast_box.size = Vector2(220, 0)
 	toast_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	toast_box.add_theme_constant_override("separation", 8)
