@@ -9,6 +9,13 @@ const WOOD_DARK := Color("b8844a")
 const LINE := Color("8a5f32")
 
 var label := "おてつだい記録"
+var _t := 0.0
+
+
+func _process(delta: float) -> void:
+	# 名札をパチモンの「…」と同じ周期で上下に揺らす
+	_t += delta
+	queue_redraw()
 
 
 const TAG_POS := Vector2(0, -72)
@@ -34,7 +41,7 @@ func _draw() -> void:
 	draw_colored_polygon(edge, WOOD)
 	ItemArt.outline(self, edge, LINE, 2.5)
 	_draw_notebook()
-	ItemArt.name_tag(self, TAG_POS, label, FONT)
+	ItemArt.name_tag(self, TAG_POS + Vector2(0, sin(_t * 3.0) * 4.0), label, FONT)
 
 
 ## 開いたノートと鉛筆
