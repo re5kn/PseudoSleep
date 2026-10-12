@@ -245,7 +245,7 @@ func _test_skill_ceiling_stock2() -> void:
 	check(d["stock"] == 2 and d["ceiling"] == 1, "タップでストック2、うち天井1を知らせる (stock %d, ceiling %d)" % [d["stock"], d["ceiling"]])
 
 
-## ストック2でストック1のときにタップすると、不発カウントも0に戻る（#39）
+## ストック2でストック1のときにタップすると、不発カウントも0に戻る。ストックがないタップでは戻らない（#39）
 func _test_skill_miss_reset_on_tap() -> void:
 	print("タップで不発カウントを0に戻す")
 	var p := Params.new()
@@ -266,6 +266,13 @@ func _test_skill_miss_reset_on_tap() -> void:
 	check(r["skills"] == 0 and s.skill_miss == 5, "タップ後は0から数え直して5回不発 (miss %d)" % s.skill_miss)
 	r = s.advance(t)
 	check(r["skills"] == 1 and r["skill_ceiling_hits"] == 1, "タップ後6回目で天井発動（タップ前の3回は数えない）")
+	s.drop()
+	r = s.advance(t * 2)
+	check(s.skill_stock == 0 and s.skill_miss == 2, "ストックを空にしたあと不発2回 (miss %d)" % s.skill_miss)
+	d = s.drop()
+	check(d["stock"] == 0 and s.skill_miss == 2, "ストックがないときのタップでは不発カウントは戻らない (miss %d)" % s.skill_miss)
+	r = s.advance(t * 2)
+	check(s.skill_miss == 4, "そのまま続けて数える (miss %d)" % s.skill_miss)
 
 
 func _test_name_width() -> void:
