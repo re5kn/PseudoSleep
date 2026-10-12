@@ -14,6 +14,8 @@ const TEXT_MUTED := Color("a08c74")
 const STRIPE := Color(0.96, 0.9, 0.78, 0.45)
 const EXCLAIM_FILL := Color("ffd93b")
 const CEILING_COLOR := Color("e2483d")
+## タップ前（まだストックにあるだけ）のスキルの濃さ
+const RESERVED_ALPHA := 0.4
 const TAP_BAND := Color("d6effa")
 const TAP_COLOR := Color("2f86c4")
 ## 列の左端と幅
@@ -89,13 +91,16 @@ func _draw_row(i: int, y: float) -> void:
 	else:
 		ItemArt.draw_item(self, e["id"], Vector2(COL_ITEM.x + 18, cy + 2), 0.95)
 		_text("×%d" % e["amount"], Vector2(COL_ITEM.x + 42, 100), y, HORIZONTAL_ALIGNMENT_LEFT, TEXT_DARK)
+	# おてつだいの行で発動したスキルはまだストックにあるだけなので、薄くして「予約」と書く
 	match int(e["skill"]):
 		Sim.Skill.HIT:
-			_exclaim(Vector2(COL_SKILL.x + 20, cy), EXCLAIM_FILL, CEILING_COLOR)
+			_exclaim(Vector2(COL_SKILL.x + 20, cy), 1, EXCLAIM_FILL, CEILING_COLOR, RESERVED_ALPHA)
+			_text("予約", Vector2(COL_SKILL.x + 44, 80), y, HORIZONTAL_ALIGNMENT_LEFT, TEXT_MUTED)
 		Sim.Skill.CEILING:
 			# 天井で出た回は色を反転させ、横に「天井」と添える
-			_exclaim(Vector2(COL_SKILL.x + 20, cy), CEILING_COLOR, Color.WHITE)
-			_text("天井", Vector2(COL_SKILL.x + 44, 80), y, HORIZONTAL_ALIGNMENT_LEFT, CEILING_COLOR)
+			_exclaim(Vector2(COL_SKILL.x + 20, cy), 1, CEILING_COLOR, Color.WHITE, RESERVED_ALPHA)
+			_text("天井予約", Vector2(COL_SKILL.x + 44, 90), y, HORIZONTAL_ALIGNMENT_LEFT,
+				Color(CEILING_COLOR, RESERVED_ALPHA))
 
 
 func _draw_time(e: Dictionary, y: float) -> void:
@@ -110,21 +115,18 @@ func _draw_tap_row(e: Dictionary, y: float) -> void:
 	_draw_time(e, y)
 	var amount := int(e["amount"])
 	_text("タップ" if amount == 0 else "タップ %d個" % amount, COL_ITEM, y, HORIZONTAL_ALIGNMENT_LEFT, TAP_COLOR)
+	# 使ったストックはパチモンの頭上と同じ「!」「!!」で出す
 	var stock := int(e["stock"])
 	if stock > 0:
-		var cy := y + ROW_H / 2
-		if int(e["ceiling"]) > 0:
-			_exclaim(Vector2(COL_SKILL.x + 20, cy), CEILING_COLOR, Color.WHITE)
-		else:
-			_exclaim(Vector2(COL_SKILL.x + 20, cy), EXCLAIM_FILL, CEILING_COLOR)
-		_text("×%d" % stock, Vector2(COL_SKILL.x + 44, 80), y, HORIZONTAL_ALIGNMENT_LEFT, TAP_COLOR)
+		_exclaim(Vector2(COL_SKILL.x + 28, y + ROW_H / 2), stock, EXCLAIM_FILL, CEILING_COLOR)
 
 
-## パチモンの頭上に出る「!」と同じ形の小さな印
-func _exclaim(c: Vector2, fill: Color, mark: Color) -> void:
-	var burst := ItemArt.burst(c, 14.0)
-	draw_colored_polygon(burst, fill)
-	ItemArt.outline(self, burst, CEILING_COLOR, 2.0)
+## パチモンの頭上に出る「!」と同じ形の小さな印。n 個並べるとギザギザも横に伸ばす。alpha で薄くする
+func _exclaim(c: Vector2, n: int, fill: Color, mark: Color, alpha: float = 1.0) -> void:
+	var burst := ItemArt.burst(c, 14.0, 1.0 + 0.3 * (n - 1))
+	draw_colored_polygon(burst, Color(fill, alpha))
+	ItemArt.outline(self, burst, Color(CEILING_COLOR, alpha), 2.0)
+	var w := 40.0 * n
 	draw_set_transform(c, ItemArt.EXCLAIM_TILT)
-	draw_string(FONT, Vector2(-20, 8), "!", HORIZONTAL_ALIGNMENT_CENTER, 40, 24, mark)
+	draw_string(FONT, Vector2(-w / 2, 8), "!".repeat(n), HORIZONTAL_ALIGNMENT_CENTER, w, 24, Color(mark, alpha))
 	draw_set_transform(Vector2.ZERO)
