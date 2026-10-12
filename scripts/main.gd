@@ -421,7 +421,7 @@ func _set_log_slide(t: float) -> void:
 
 ## 開いたままでも「すすめる」やリセットに合わせて記録を更新する
 func _update_log() -> void:
-	log_title.text = "おてつだいの記録（全%d回）" % sim.help_log.size()
+	log_title.text = "おてつだいの記録（全%d回）" % sim.totals["helps"]
 	log_table.set_log(sim.help_log)
 
 

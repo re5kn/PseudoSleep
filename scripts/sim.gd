@@ -43,6 +43,8 @@ var ceiling_stock := 0
 var totals := {}
 ## おてつだい1回ごとの記録（リセットまで）。要素は
 ## {"t": 終わった時刻(秒), "id": 獲得したもの（いつのまに育成なら ""）, "amount": 獲得数, "skill": Skill}
+## パチモンをタップした時点の行も時刻順に混ざる。タップの行は
+## {"t": タップした時刻(秒), "tap": true, "amount": フィールドへ出した数, "stock": 使ったスキルのストック, "ceiling": うち天井の分}
 var help_log: Array[Dictionary] = []
 
 enum Skill { NONE, HIT, CEILING }
@@ -198,6 +200,11 @@ func held_count() -> int:
 	return sum(pending) + sum(on_field)
 
 
+## 記録のうちタップの行か
+static func is_tap(e: Dictionary) -> bool:
+	return e.get("tap", false)
+
+
 func pending_count() -> int:
 	return sum(pending)
 
@@ -214,9 +221,15 @@ func has_icon() -> bool:
 ## タップしたときの処理。持っている分をフィールドへ出し、スキルのストックを消費する。
 func drop() -> Dictionary:
 	var result := {"items": pending.duplicate(), "stock": skill_stock, "ceiling": ceiling_stock}
+	var dropped := pending_count()
+	if dropped > 0 or skill_stock > 0:
+		help_log.append({"t": elapsed_sec, "tap": true, "amount": dropped, "stock": skill_stock, "ceiling": ceiling_stock})
 	for id in pending:
 		on_field[id] = int(on_field.get(id, 0)) + int(pending[id])
 	pending.clear()
+	# メインスキルのストックがあったタップでは、不発カウントも0から数え直す
+	if skill_stock > 0:
+		skill_miss = 0
 	skill_stock = 0
 	ceiling_stock = 0
 	return result

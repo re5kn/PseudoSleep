@@ -19,6 +19,8 @@ func _init() -> void:
 	_test_subskill_slots()
 	_test_skill_ceiling()
 	_test_skill_ceiling_stock2()
+	_test_skill_miss_reset_on_tap()
+	_test_tap_log()
 	_test_name_width()
 	_test_example1_help_count()
 	_test_example2_help_count()
@@ -212,7 +214,8 @@ func _test_skill_ceiling() -> void:
 	check(r["skills"] == 0, "タップ後も5回目までは発動しない (got %d)" % r["skills"])
 	r = s.advance(p.help_sec() * 0.45)
 	check(r["skills"] == 1, "タップ後はまた6回目で発動 (got %d)" % r["skills"])
-	var kinds := s.help_log.map(func(e: Dictionary) -> int: return e["skill"])
+	var helps := s.help_log.filter(func(e: Dictionary) -> bool: return not Sim.is_tap(e))
+	var kinds := helps.map(func(e: Dictionary) -> int: return e["skill"])
 	check(kinds.size() == 32 and kinds[5] == Sim.Skill.CEILING and kinds[31] == Sim.Skill.CEILING and kinds.count(Sim.Skill.CEILING) == 2
 		and kinds.count(Sim.Skill.HIT) == 0, "記録では6回目と32回目が天井 (%d件)" % kinds.size())
 
@@ -244,6 +247,58 @@ func _test_skill_ceiling_stock2() -> void:
 	check(r["skills"] == 0 and s.skill_miss == 0, "ストックが上限になったら抽選せず、不発カウントも増えない")
 	var d := s.drop()
 	check(d["stock"] == 2 and d["ceiling"] == 1, "タップでストック2、うち天井1を知らせる (stock %d, ceiling %d)" % [d["stock"], d["ceiling"]])
+
+
+## ストック2でストック1のときにタップすると、不発カウントも0に戻る。ストックがないタップでは戻らない（#39）
+func _test_skill_miss_reset_on_tap() -> void:
+	print("タップで不発カウントを0に戻す")
+	var p := Params.new()
+	p.max_carry = 1000000
+	p.skill_prob = 0.0
+	p.skill_ceiling = 5
+	p.max_skill_stock = 2
+	var s := Sim.new(p)
+	var t := p.help_sec() * 0.45
+	s.advance(t * 6 + 1)
+	check(s.skill_stock == 1 and s.skill_miss == 0, "6回目に天井で発動してストック1")
+	var r := s.advance(t * 3)
+	check(r["skills"] == 0 and s.skill_miss == 3, "その後3回不発 (miss %d)" % s.skill_miss)
+	var d := s.drop()
+	check(d["stock"] == 1 and s.skill_stock == 0, "タップでストックが空になる")
+	check(s.skill_miss == 0, "タップで不発カウントも0に戻る (miss %d)" % s.skill_miss)
+	r = s.advance(t * 5)
+	check(r["skills"] == 0 and s.skill_miss == 5, "タップ後は0から数え直して5回不発 (miss %d)" % s.skill_miss)
+	r = s.advance(t)
+	check(r["skills"] == 1 and r["skill_ceiling_hits"] == 1, "タップ後6回目で天井発動（タップ前の3回は数えない）")
+	s.drop()
+	r = s.advance(t * 2)
+	check(s.skill_stock == 0 and s.skill_miss == 2, "ストックを空にしたあと不発2回 (miss %d)" % s.skill_miss)
+	d = s.drop()
+	check(d["stock"] == 0 and s.skill_miss == 2, "ストックがないときのタップでは不発カウントは戻らない (miss %d)" % s.skill_miss)
+	r = s.advance(t * 2)
+	check(s.skill_miss == 4, "そのまま続けて数える (miss %d)" % s.skill_miss)
+
+
+func _test_tap_log() -> void:
+	print("記録にタップした時点の行が入る")
+	var p := Params.new()
+	p.max_carry = 1000000
+	p.skill_prob = 0.0
+	p.skill_ceiling = 2
+	p.max_skill_stock = 2
+	var s := Sim.new(p)
+	var t := p.help_sec() * 0.45
+	s.advance(t * 3 + 1)
+	var held := s.pending_count()
+	s.drop()
+	var e: Dictionary = s.help_log[-1]
+	check(s.help_log.size() == 4 and Sim.is_tap(e), "おてつだい3回のあとにタップの行")
+	check(e["t"] == s.elapsed_sec and e["amount"] == held, "タップの時刻と出した数 (%d個)" % e["amount"])
+	check(e["stock"] == 1 and e["ceiling"] == 1, "使ったストック1（天井）")
+	s.drop()
+	check(s.help_log.size() == 4, "何も持っていないときのタップは記録しない")
+	s.advance(t)
+	check(not Sim.is_tap(s.help_log[-1]) and s.help_log[-1]["t"] > e["t"], "タップのあとのおてつだいはその後ろ")
 
 
 func _test_name_width() -> void:
@@ -353,9 +408,11 @@ func _test_capacity() -> void:
 	var r2 := s.advance(3600.0 * 4)
 	check(r2["helps"] == r2["full_helps"], "残置中はすべていつのまに育成")
 	var t := s.totals
-	check(s.help_log.size() == t["helps"], "1回ごとの記録はおてつだい回数と同じ件数")
-	var full := s.help_log.filter(func(e: Dictionary) -> bool: return e["id"] == "")
+	var helps := s.help_log.filter(func(e: Dictionary) -> bool: return not Sim.is_tap(e))
+	check(helps.size() == t["helps"], "1回ごとの記録はおてつだい回数と同じ件数")
+	var full := helps.filter(func(e: Dictionary) -> bool: return e["id"] == "")
 	check(full.size() == t["full_helps"], "記録のいつのまに育成の件数が合う")
+	check(s.help_log.size() == helps.size() + 1, "タップの行が1つ入る")
 	var times := s.help_log.map(func(e: Dictionary) -> float: return e["t"])
 	var sorted := times.duplicate()
 	sorted.sort()
