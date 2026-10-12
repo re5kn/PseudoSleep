@@ -118,7 +118,7 @@ func _draw_tap_row(e: Dictionary, y: float) -> void:
 	# 使ったストックはパチモンの頭上と同じ「!」「!!」で出す
 	var stock := int(e["stock"])
 	if stock > 0:
-		_exclaim(Vector2(COL_SKILL.x + 28, y + ROW_H / 2), stock, EXCLAIM_FILL, CEILING_COLOR)
+		_exclaim(Vector2(COL_SKILL.x + 20, y + ROW_H / 2), stock, EXCLAIM_FILL, CEILING_COLOR)
 
 
 ## パチモンの頭上に出る「!」と同じ形の小さな印。n 個並べるとギザギザも横に伸ばす。alpha で薄くする
