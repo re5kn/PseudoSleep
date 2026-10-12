@@ -1,6 +1,7 @@
 extends Control
 ## おてつだい1回ごとの記録の表。ScrollContainer に入れて使い、見えている行だけ描く。
 ## header = true なら列の見出しだけを描く。
+## パチモンをタップした時点には、おてつだいの行のあいだに色つきの「タップ」行を挟む。
 
 const ItemArt = preload("res://scripts/item_art.gd")
 const Sim = preload("res://scripts/sim.gd")
@@ -13,6 +14,8 @@ const TEXT_MUTED := Color("a08c74")
 const STRIPE := Color(0.96, 0.9, 0.78, 0.45)
 const EXCLAIM_FILL := Color("ffd93b")
 const CEILING_COLOR := Color("e2483d")
+const TAP_BAND := Color("d6effa")
+const TAP_COLOR := Color("2f86c4")
 ## 列の左端と幅
 const COL_K := Vector2(0, 56)
 const COL_TIME := Vector2(68, 84)
@@ -21,6 +24,8 @@ const COL_SKILL := Vector2(330, 130)
 
 var header := false
 var entries: Array[Dictionary] = []
+## entries の各行が何回目のおてつだいか（タップの行は 0）
+var help_numbers: PackedInt32Array = []
 
 
 func _init(is_header: bool = false) -> void:
@@ -31,6 +36,14 @@ func _init(is_header: bool = false) -> void:
 
 func set_log(list: Array[Dictionary]) -> void:
 	entries = list
+	help_numbers.resize(entries.size())
+	var k := 0
+	for i in entries.size():
+		if not Sim.is_tap(entries[i]):
+			k += 1
+			help_numbers[i] = k
+		else:
+			help_numbers[i] = 0
 	custom_minimum_size.y = ROW_H * maxi(1, entries.size())
 	queue_redraw()
 
@@ -63,11 +76,13 @@ func _draw() -> void:
 
 func _draw_row(i: int, y: float) -> void:
 	var e: Dictionary = entries[i]
-	if i % 2 == 1:
+	if Sim.is_tap(e):
+		_draw_tap_row(e, y)
+		return
+	if help_numbers[i] % 2 == 0:
 		draw_rect(Rect2(0, y, size.x, ROW_H), STRIPE)
-	_text(str(i + 1), COL_K, y, HORIZONTAL_ALIGNMENT_RIGHT, TEXT_DARK)
-	var total_min := int(e["t"] / 60.0)
-	_text("%d:%02d" % [total_min / 60, total_min % 60], COL_TIME, y, HORIZONTAL_ALIGNMENT_CENTER, TEXT_DARK)
+	_text(str(help_numbers[i]), COL_K, y, HORIZONTAL_ALIGNMENT_RIGHT, TEXT_DARK)
+	_draw_time(e, y)
 	var cy := y + ROW_H / 2
 	if e["id"] == "":
 		_text("いつのまに育成", COL_ITEM, y, HORIZONTAL_ALIGNMENT_LEFT, TEXT_MUTED)
@@ -81,6 +96,28 @@ func _draw_row(i: int, y: float) -> void:
 			# 天井で出た回は色を反転させ、横に「天井」と添える
 			_exclaim(Vector2(COL_SKILL.x + 20, cy), CEILING_COLOR, Color.WHITE)
 			_text("天井", Vector2(COL_SKILL.x + 44, 80), y, HORIZONTAL_ALIGNMENT_LEFT, CEILING_COLOR)
+
+
+func _draw_time(e: Dictionary, y: float) -> void:
+	var total_min := int(e["t"] / 60.0)
+	_text("%d:%02d" % [total_min / 60, total_min % 60], COL_TIME, y, HORIZONTAL_ALIGNMENT_CENTER, TEXT_DARK)
+
+
+## タップした時点の行。回の列は空けて、出した数と使ったスキルのストックを書く
+func _draw_tap_row(e: Dictionary, y: float) -> void:
+	draw_rect(Rect2(0, y + 3, size.x, ROW_H - 6), TAP_BAND)
+	draw_rect(Rect2(0, y + 3, 5, ROW_H - 6), TAP_COLOR)
+	_draw_time(e, y)
+	var amount := int(e["amount"])
+	_text("タップ" if amount == 0 else "タップ %d個" % amount, COL_ITEM, y, HORIZONTAL_ALIGNMENT_LEFT, TAP_COLOR)
+	var stock := int(e["stock"])
+	if stock > 0:
+		var cy := y + ROW_H / 2
+		if int(e["ceiling"]) > 0:
+			_exclaim(Vector2(COL_SKILL.x + 20, cy), CEILING_COLOR, Color.WHITE)
+		else:
+			_exclaim(Vector2(COL_SKILL.x + 20, cy), EXCLAIM_FILL, CEILING_COLOR)
+		_text("×%d" % stock, Vector2(COL_SKILL.x + 44, 80), y, HORIZONTAL_ALIGNMENT_LEFT, TAP_COLOR)
 
 
 ## パチモンの頭上に出る「!」と同じ形の小さな印
