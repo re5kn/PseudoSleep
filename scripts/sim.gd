@@ -219,6 +219,8 @@ func drop() -> Dictionary:
 	pending.clear()
 	skill_stock = 0
 	ceiling_stock = 0
+	# タップしたら不発カウントも0から数え直す
+	skill_miss = 0
 	return result
 
 
