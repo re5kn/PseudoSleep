@@ -217,6 +217,9 @@ func drop() -> Dictionary:
 	for id in pending:
 		on_field[id] = int(on_field.get(id, 0)) + int(pending[id])
 	pending.clear()
+	# メインスキルのストックがあったタップでは、不発カウントも0から数え直す
+	if skill_stock > 0:
+		skill_miss = 0
 	skill_stock = 0
 	ceiling_stock = 0
 	return result

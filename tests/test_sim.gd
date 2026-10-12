@@ -18,6 +18,7 @@ func _init() -> void:
 	_test_subskill_slots()
 	_test_skill_ceiling()
 	_test_skill_ceiling_stock2()
+	_test_skill_miss_reset_on_tap()
 	_test_name_width()
 	_test_example1_help_count()
 	_test_example2_help_count()
@@ -242,6 +243,36 @@ func _test_skill_ceiling_stock2() -> void:
 	check(r["skills"] == 0 and s.skill_miss == 0, "ストックが上限になったら抽選せず、不発カウントも増えない")
 	var d := s.drop()
 	check(d["stock"] == 2 and d["ceiling"] == 1, "タップでストック2、うち天井1を知らせる (stock %d, ceiling %d)" % [d["stock"], d["ceiling"]])
+
+
+## ストック2でストック1のときにタップすると、不発カウントも0に戻る。ストックがないタップでは戻らない（#39）
+func _test_skill_miss_reset_on_tap() -> void:
+	print("タップで不発カウントを0に戻す")
+	var p := Params.new()
+	p.max_carry = 1000000
+	p.skill_prob = 0.0
+	p.skill_ceiling = 5
+	p.max_skill_stock = 2
+	var s := Sim.new(p)
+	var t := p.help_sec() * 0.45
+	s.advance(t * 6 + 1)
+	check(s.skill_stock == 1 and s.skill_miss == 0, "6回目に天井で発動してストック1")
+	var r := s.advance(t * 3)
+	check(r["skills"] == 0 and s.skill_miss == 3, "その後3回不発 (miss %d)" % s.skill_miss)
+	var d := s.drop()
+	check(d["stock"] == 1 and s.skill_stock == 0, "タップでストックが空になる")
+	check(s.skill_miss == 0, "タップで不発カウントも0に戻る (miss %d)" % s.skill_miss)
+	r = s.advance(t * 5)
+	check(r["skills"] == 0 and s.skill_miss == 5, "タップ後は0から数え直して5回不発 (miss %d)" % s.skill_miss)
+	r = s.advance(t)
+	check(r["skills"] == 1 and r["skill_ceiling_hits"] == 1, "タップ後6回目で天井発動（タップ前の3回は数えない）")
+	s.drop()
+	r = s.advance(t * 2)
+	check(s.skill_stock == 0 and s.skill_miss == 2, "ストックを空にしたあと不発2回 (miss %d)" % s.skill_miss)
+	d = s.drop()
+	check(d["stock"] == 0 and s.skill_miss == 2, "ストックがないときのタップでは不発カウントは戻らない (miss %d)" % s.skill_miss)
+	r = s.advance(t * 2)
+	check(s.skill_miss == 4, "そのまま続けて数える (miss %d)" % s.skill_miss)
 
 
 func _test_name_width() -> void:
