@@ -6,6 +6,7 @@ extends SceneTree
 
 const Sim = preload("res://scripts/sim.gd")
 const Params = preload("res://scripts/params.gd")
+const FieldClock = preload("res://scripts/field_clock.gd")
 
 var failures := 0
 
@@ -29,6 +30,7 @@ func _init() -> void:
 	_test_capacity()
 	_test_skill_stock()
 	_test_collect_limits()
+	_test_time_phase()
 	if failures == 0:
 		print("ALL TESTS PASSED")
 	else:
@@ -453,3 +455,21 @@ func _test_collect_limits() -> void:
 	check(int(s.on_field.get("berry", 0)) == 6, "入りきらない6個はフィールドに残る")
 	check(s.collect("ing_a") == 0, "食材箱が800で満杯なら入らない")
 	check(int(s.on_field.get("ing_a", 0)) == 6, "食材はフィールドに残る")
+
+
+## 昼 7:00〜16:00、夕方 16:00〜18:00、夜 18:00〜翌7:00。時計は朝4:00から始まり、日付も朝4:00で変わる
+func _test_time_phase() -> void:
+	print("time phase")
+	var D := FieldClock.Phase.DAY
+	var E := FieldClock.Phase.EVENING
+	var N := FieldClock.Phase.NIGHT
+	check(FieldClock.START_SEC == 4 * 3600.0, "start at 4:00")
+	var cases := [[7, D], [15.99, D], [16, E], [17.99, E], [18, N], [23.5, N], [0, N], [6.99, N], [31, D], [40, E], [42, N]]
+	for c in cases:
+		check(FieldClock.phase_at(c[0] * 3600.0) == c[1], "%.2f h -> phase %d" % [c[0], c[1]])
+	# 記録の「n日目」「時刻」はリセットからの経過秒から出す
+	check(FieldClock.day_and_clock(0.0) == [1, "4:00"], "elapsed 0 -> day 1 4:00")
+	check(FieldClock.day_and_clock(20 * 3600.0) == [1, "0:00"], "elapsed 20h -> day 1 0:00")
+	check(FieldClock.day_and_clock(23 * 3600.0 + 59 * 60 + 59) == [1, "3:59"], "elapsed 23:59:59 -> day 1 3:59")
+	check(FieldClock.day_and_clock(24 * 3600.0) == [2, "4:00"], "elapsed 24h -> day 2 4:00")
+	check(FieldClock.day_and_clock(51 * 3600.0 + 30 * 60) == [3, "7:30"], "elapsed 51.5h -> day 3 7:30")
