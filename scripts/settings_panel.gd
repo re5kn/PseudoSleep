@@ -15,10 +15,11 @@ const LINE := Color("e6cf9f")
 ## 補正値の出典
 const SOURCE_URL := "https://pks.raenonx.cc/"
 
-## 数値の行: [ラベル, Params の項目, 単位, 最小, 最大, 刻み, 画面の値＝Params の値×scale]
+## 数値の行: [ラベル, Params の項目, 単位, 最小, 最大, 刻み, 画面の値＝Params の値×scale(, 上下ボタンの幅)]
+## 上下ボタンの幅を省くと刻みと同じ。手入力は刻み単位
 const NUMBER_ROWS := [
 	["LV", "level", "", 1, 100, 1, 1.0],
-	["基準おてつだい時間", "base_help_sec", "秒", 1, 99999, 1, 1.0],
+	["基準おてつだい時間", "base_help_sec", "秒", 1, 99999, 1, 1.0, 50],
 	["食材確率", "ingredient_prob", "%", 0, 100, 0.1, 100.0],
 	["スキル発生確率", "skill_prob", "%", 0, 100, 0.1, 100.0],
 	["スキル連続不発上限", "skill_ceiling", "回", 1, 9999, 1, 1.0],
@@ -201,6 +202,8 @@ func _number_row(parent: Control, spec: Array) -> void:
 	spin.min_value = spec[3]
 	spin.max_value = spec[4]
 	spin.step = spec[5]
+	if spec.size() > 7:
+		spin.custom_arrow_step = spec[7]
 	spin.custom_minimum_size = Vector2(138, 0)
 	spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	spin.select_all_on_focus = true
