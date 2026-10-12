@@ -18,7 +18,7 @@ const SOURCE_URL := "https://pks.raenonx.cc/"
 ## 数値の行: [ラベル, Params の項目, 単位, 最小, 最大, 刻み, 画面の値＝Params の値×scale]
 const NUMBER_ROWS := [
 	["LV", "level", "", 1, 100, 1, 1.0],
-	["基準おてつだい時間", "base_help_sec", "秒", 1, 99999, 1, 1.0],
+	["基準おてつだい時間", "base_help_sec", "秒", 50, 99950, 50, 1.0],
 	["食材確率", "ingredient_prob", "%", 0, 100, 0.1, 100.0],
 	["スキル発生確率", "skill_prob", "%", 0, 100, 0.1, 100.0],
 	["スキル連続不発上限", "skill_ceiling", "回", 1, 9999, 1, 1.0],
