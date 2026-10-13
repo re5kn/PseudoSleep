@@ -17,6 +17,7 @@ func _init() -> void:
 	_test_modifiers()
 	_test_event()
 	_test_ex_mode()
+	_test_camp_ticket()
 	_test_slots_by_level()
 	_test_subskill_slots()
 	_test_skill_ceiling()
@@ -227,6 +228,28 @@ func _test_ex_mode() -> void:
 	check(ok and s.help_log.size() > 0, "確率100%%なら毎回 +1+2個")
 	p.ex_extra_ingredient_prob = 0.0
 	check(not p.has_extra_ingredient(), "確率0%%なら追加なし")
+
+
+func _test_camp_ticket() -> void:
+	print("いいキャンプチケット")
+	var p := Params.new()
+	check(p.help_sec() == 1940.0 and p.carry_limit() == 22, "OFF なら補正なし")
+	p.camp_ticket = true
+	# 2200×0.882÷1.2 = 1617.0
+	check(p.help_sec() == 1617.0, "おてつだい時間÷1.2は1617秒 (got %f)" % p.help_sec())
+	check(p.carry_limit() == 27, "最大所持数22×1.2=26.4は切り上げて27 (got %d)" % p.carry_limit())
+	p.max_carry = 25
+	check(p.carry_limit() == 30, "25×1.2=30.0はそのまま30 (got %d)" % p.carry_limit())
+	p.max_carry = 23
+	p.event_on = true
+	p.event_carry_mult = 1.1
+	# 23×1.1×1.2 = 30.36 → 31
+	check(p.carry_limit() == 31, "イベント1.1倍とチケットで23×1.1×1.2=30.36→31 (got %d)" % p.carry_limit())
+	p.event_on = false
+	p.ex_on = true
+	p.ex_help_time_pct = -10.0
+	# 2200×0.882×0.9÷1.2 = 1455.3
+	check(p.help_sec() == 1455.0, "EXモード−10%%とチケットで1455秒 (got %f)" % p.help_sec())
 
 
 func _test_slots_by_level() -> void:

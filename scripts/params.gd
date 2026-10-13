@@ -81,6 +81,8 @@ var ex_extra_ingredient := 0
 var ex_extra_ingredient_prob := 0.0
 ## EXモード: スキル発生確率の倍率
 var ex_skill_mult := 1.0
+## いいキャンプチケット（最大所持数 1.2倍・おてつだいスピード 1.2倍）
+var camp_ticket := false
 ## false にすると、レベルに関係なくすべての食材枠を使う（テスト用）
 var unlock_slots_by_level := true
 
@@ -194,13 +196,18 @@ func ex_time_factor() -> float:
 	return maxf(0.01, 1.0 + ex_help_time_pct / 100.0) if ex_on else 1.0
 
 
+## いいキャンプチケットの倍率（所持数・おてつだいスピード）
+func camp_factor() -> float:
+	return 1.2 if camp_ticket else 1.0
+
+
 ## げんき補正をかける前のおてつだい時間（秒）。
-## 基準時間×レベル補正×せいかく補正×サブスキル補正×おやすみリボン補正×EXモード補正
+## 基準時間×レベル補正×せいかく補正×サブスキル補正×おやすみリボン補正×EXモード補正÷いいキャンプチケット(1.2)
 ## を掛け合わせてから小数点以下を切り捨てる。
 ## せいかくの補正は時間に対して上昇 0.9倍／下降 1.075倍（スピード 1.11倍／0.93倍 に当たる）。
 func help_sec() -> float:
 	var t := base_help_sec * level_factor(level) * _nature_factor(Nature.SPEED, 0.9, 1.075) \
-		* (1.0 - speed_reduction()) * ribbon_speed_factor() * ex_time_factor()
+		* (1.0 - speed_reduction()) * ribbon_speed_factor() * ex_time_factor() / camp_factor()
 	# 0.882 などが浮動小数でわずかに小さくなり、1秒ずれないように少し足してから切り捨てる
 	return floorf(t + 1e-6)
 
@@ -228,7 +235,7 @@ func skill_chance() -> float:
 
 
 ## 補正後の最大所持数。サブスキル（L +18・M +12・S +6）・おやすみリボン・イベントの増加数を足してから、
-## イベントの倍率を掛けて小数点以下を切り上げる。
+## イベントの倍率といいキャンプチケット（1.2倍）を掛けて小数点以下を切り上げる。
 func carry_limit() -> int:
 	var n := max_carry + ribbon_carry_bonus()
 	if has_subskill("carry_l"):
@@ -237,11 +244,11 @@ func carry_limit() -> int:
 		n += 12
 	if has_subskill("carry_s"):
 		n += 6
-	var mult := 1.0
+	var mult := camp_factor()
 	if event_on:
 		n += event_carry_add
 		mult *= event_carry_mult
-	# 倍率を掛けた値が浮動小数でわずかに大きくなり、1つ増えないように少し引いてから切り上げる
+	# 25×1.2=30.0 などが浮動小数でわずかに大きくなり、1つ増えないように少し引いてから切り上げる
 	return maxi(1, int(ceil(n * mult - 1e-6)))
 
 
