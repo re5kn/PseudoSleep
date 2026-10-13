@@ -28,6 +28,7 @@ func _init() -> void:
 	_test_skill_miss_reset_on_tap()
 	_test_tap_log()
 	_test_add_genki()
+	_test_genki_nature()
 	_test_fairy_sim()
 	_test_name_width()
 	_test_example1_help_count()
@@ -504,6 +505,28 @@ func _test_add_genki() -> void:
 	check(is_equal_approx(interval, s.params.help_sec() * 0.66), "げんき10のおてつだい間隔は0.66倍")
 	s.add_genki(80)
 	check(is_equal_approx(s.help_interval_at(s.elapsed_sec), s.params.help_sec() * 0.45), "90に回復すると0.45倍")
+
+
+## せいかくのげんき回復: 増やすときだけ 上昇1.2倍／下降0.88倍（切り捨て）。減らすときは掛けない
+func _test_genki_nature() -> void:
+	print("せいかくのげんき回復")
+	var p := Params.new()
+	p.nature_up = Params.Nature.GENKI
+	var s := Sim.new(p)
+	s.set_genki_mode(Sim.GenkiMode.DECAY)
+	s.add_genki(-50)
+	s.add_genki(5)
+	check(s.genki_at(0.0) == 56, "上昇: 50から5×1.2=6回復 (got %d)" % s.genki_at(0.0))
+	s.add_genki(7)
+	check(s.genki_at(0.0) == 64, "上昇: 7×1.2=8.4は8 (got %d)" % s.genki_at(0.0))
+	s.add_genki(-10)
+	check(s.genki_at(0.0) == 54, "減らすときは倍率を掛けない (got %d)" % s.genki_at(0.0))
+	p.nature_up = Params.Nature.NONE
+	p.nature_down = Params.Nature.GENKI
+	s.add_genki(10)
+	check(s.genki_at(0.0) == 62, "下降: 10×0.88=8.8は8 (got %d)" % s.genki_at(0.0))
+	s.add_genki(-10)
+	check(s.genki_at(0.0) == 52, "下降でも減らすときは掛けない (got %d)" % s.genki_at(0.0))
 
 
 ## 妖精: 持っている分はタップで消え、休んでいるあいだは時間だけ進む

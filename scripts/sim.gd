@@ -107,10 +107,14 @@ func _genki_decayed(t: float) -> int:
 
 
 ## 今のげんきを amount 増やす（負なら減らす。0〜GENKI_MAX）。10分ごとに減る区切りはそのまま。
+## 増やすときは自分のせいかく（げんき回復）の倍率を掛けて小数点以下を切り捨てる。減らすときは掛けない。
 ## 「81以上で固定」のときは変わらない。
 func add_genki(amount: int) -> void:
 	if genki_mode == GenkiMode.ALWAYS_HIGH:
 		return
+	if amount > 0:
+		# 5×1.2=6.0 などが浮動小数でわずかに小さくなり、1減らないように少し足してから切り捨てる
+		amount = int(floor(amount * params.genki_recovery_factor() + 1e-6))
 	var g := clampi(genki_at(elapsed_sec) + amount, 0, GENKI_MAX)
 	genki_base = g + _genki_decayed(elapsed_sec)
 

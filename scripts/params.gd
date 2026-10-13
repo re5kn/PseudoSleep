@@ -212,6 +212,11 @@ func help_sec() -> float:
 	return floorf(t + 1e-6)
 
 
+## せいかくのげんき回復量の倍率（上昇 1.2倍／下降 0.88倍）
+func genki_recovery_factor() -> float:
+	return _nature_factor(Nature.GENKI, 1.2, 0.88)
+
+
 ## 補正後の食材確率。せいかく（1.2倍／0.8倍）と食材確率アップ（M +36%・S +18%、足し算）を掛ける。
 func ingredient_chance() -> float:
 	var sub := 1.0
