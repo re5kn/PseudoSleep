@@ -3,6 +3,7 @@ extends PanelContainer
 ## 値を変えるとすぐ Params に書き込み、changed を出す（次の「すすめる」から反映される）。
 
 const Params = preload("res://scripts/params.gd")
+const Presets = preload("res://scripts/presets.gd")
 
 signal changed
 signal close_requested
@@ -33,6 +34,24 @@ const NUMBER_ROWS := [
 	["睡眠時間（おやすみリボン）", "ribbon_sleep_hours", "時間", 0, 99999, 1, 1.0],
 ]
 
+## イベント補正の行（チェックが入っているときだけ表示）
+const EVENT_ROWS := [
+	["きのみの数の増加数", "event_berry_add", "個", 0, 99, 1, 1.0],
+	["食材の数の増加数", "event_ingredient_add", "個", 0, 99, 1, 1.0],
+	["スキル確率の倍率", "event_skill_mult", "倍", 0, 10, 0.01, 1.0, 0.1],
+	["最大所持数の増加数", "event_carry_add", "個", 0, 999, 1, 1.0],
+	["最大所持数の倍率", "event_carry_mult", "倍", 0.01, 10, 0.01, 1.0, 0.1],
+]
+
+## EXモード補正の行（チェックが入っているときだけ表示）
+const EX_ROWS := [
+	["おてつだい時間の補正", "ex_help_time_pct", "%", -99, 999, 0.1, 1.0, 1],
+	["食材の数の増加数", "ex_ingredient_add", "個", 0, 99, 1, 1.0],
+	["食材をたまに追加で持ってくる数", "ex_extra_ingredient", "個", 0, 99, 1, 1.0],
+	["追加で持ってくる確率", "ex_extra_ingredient_prob", "%", 0, 100, 0.1, 100.0, 1],
+	["スキル確率の倍率", "ex_skill_mult", "倍", 0, 10, 0.01, 1.0, 0.1],
+]
+
 const NATURE_OPTIONS := [
 	[Params.Nature.SPEED, "おてつだいスピード"],
 	[Params.Nature.INGREDIENT, "食材確率"],
@@ -41,6 +60,10 @@ const NATURE_OPTIONS := [
 ]
 
 var params: Params
+## 計算条件の保存先（設定1〜設定5）
+var presets: Presets
+var preset_select: OptionButton
+var transform_button: Button
 var summary_label: Label
 var subskill_title: Label
 ## サブスキル id → CheckBox
@@ -56,13 +79,34 @@ var down_group := ButtonGroup.new()
 
 func setup(p: Params, base_theme: Theme) -> void:
 	params = p
+	if presets == null:
+		presets = Presets.new()
 	theme = _make_theme(base_theme)
 	add_theme_stylebox_override("panel", _panel_style())
+	_build_all()
+
+
+func _build_all() -> void:
 	_build()
 	_update_nature_lock()
 	_update_subskill_boxes()
 	_update_slot_rows()
+	_update_preset_buttons()
 	_update_summary()
+
+
+## 読み込んだ設定を全部の入力欄に出し直すため、中身を作り直す
+func _rebuild() -> void:
+	for c in get_children():
+		remove_child(c)
+		c.queue_free()
+	subskill_boxes.clear()
+	number_rows.clear()
+	up_buttons.clear()
+	down_buttons.clear()
+	up_group = ButtonGroup.new()
+	down_group = ButtonGroup.new()
+	_build_all()
 
 
 # ---------------------------------------------------------------- 組み立て
@@ -101,6 +145,14 @@ func _build() -> void:
 	summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	outer.add_child(summary_label)
 
+	var name_row := _row(outer, "名前")
+	var name_edit := LineEdit.new()
+	name_edit.text = params.pseudon_name
+	name_edit.max_length = Params.NAME_MAX_WIDTH
+	name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_edit.text_changed.connect(_on_name_changed.bind(name_edit))
+	name_row.add_child(name_edit)
+
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -110,13 +162,8 @@ func _build() -> void:
 	v.add_theme_constant_override("separation", 6)
 	scroll.add_child(v)
 
-	var name_row := _row(v, "名前")
-	var name_edit := LineEdit.new()
-	name_edit.text = params.pseudon_name
-	name_edit.max_length = Params.NAME_MAX_WIDTH
-	name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	name_edit.text_changed.connect(_on_name_changed.bind(name_edit))
-	name_row.add_child(name_edit)
+	_section(v, "へんしんリスト")
+	_preset_row(v)
 
 	_section(v, "パラメータ")
 	for spec in NUMBER_ROWS:
@@ -150,13 +197,81 @@ func _build() -> void:
 	_nature_row(v, "上昇", up_group, up_buttons, true)
 	_nature_row(v, "下降", down_group, down_buttons, false)
 
+	_section(v, "イベント補正")
+	var event_rows := _toggle_rows(v, "イベント効果", "event_on")
+	for spec in EVENT_ROWS:
+		_number_row(event_rows, spec)
+
+	_section(v, "EXモード補正")
+	var ex_rows := _toggle_rows(v, "EXモード効果", "ex_on")
+	for spec in EX_ROWS:
+		_number_row(ex_rows, spec)
+
 	_section(v, "その他")
 	_number_row(v, ["他のメンバーのおてつだいボーナス数", "other_help_bonus", "", 0, 4, 1, 1.0])
+	_check(v, "いいキャンプチケット（所持数・おてつだいスピード 1.2倍）", "camp_ticket")
 
 	var note := _label("変更は次の「すすめる」から反映されます。", 15)
 	note.add_theme_color_override("font_color", TEXT_SUB)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(note)
+
+
+## [設定名のプルダウン] [変身] [記憶]
+func _preset_row(parent: Control) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	parent.add_child(row)
+	var selected := 0 if preset_select == null else preset_select.selected
+	preset_select = OptionButton.new()
+	preset_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	preset_select.focus_mode = Control.FOCUS_NONE
+	preset_select.fit_to_longest_item = false
+	preset_select.clip_text = true
+	preset_select.add_theme_font_size_override("font_size", 18)
+	preset_select.get_popup().add_theme_font_size_override("font_size", 20)
+	for i in Presets.SLOT_COUNT:
+		preset_select.add_item(presets.slot_name(i), i)
+	preset_select.select(selected)
+	preset_select.item_selected.connect(func(_i: int) -> void: _update_preset_buttons())
+	row.add_child(preset_select)
+	transform_button = _small_button("変身")
+	transform_button.pressed.connect(_on_transform)
+	row.add_child(transform_button)
+	var store := _small_button("記憶")
+	store.pressed.connect(_on_store)
+	row.add_child(store)
+
+
+func _small_button(text: String) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(76, 48)
+	b.add_theme_font_size_override("font_size", 18)
+	return b
+
+
+## 選んだ枠に保存があるときだけ変身できる
+func _update_preset_buttons() -> void:
+	transform_button.disabled = not presets.is_saved(preset_select.selected)
+
+
+## 選んだ枠の設定を呼び出し、名前欄を設定名にする
+func _on_transform() -> void:
+	if not presets.restore(preset_select.selected, params):
+		return
+	# 押したボタン自身を作り直すので、次のフレームで行う
+	_rebuild.call_deferred()
+	changed.emit()
+
+
+## 今の設定を選んだ枠に上書きで記憶する。設定名は名前欄から取る
+func _on_store() -> void:
+	var i := preset_select.selected
+	presets.store(i, params)
+	preset_select.set_item_text(i, presets.slot_name(i))
+	_update_preset_buttons()
 
 
 ## 名前は全角6文字・半角12文字まで（全角2・半角1で数えて12まで）。超えた分は後ろから削る。
@@ -192,6 +307,32 @@ func _row(parent: Control, text: String) -> HBoxContainer:
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	row.add_child(l)
 	return row
+
+
+## Params の bool 項目を切り替えるチェックボックス
+func _check(parent: Control, text: String, key: String) -> CheckBox:
+	var cb := CheckBox.new()
+	cb.text = text
+	cb.button_pressed = bool(params.get(key))
+	cb.focus_mode = Control.FOCUS_NONE
+	cb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	cb.add_theme_font_size_override("font_size", 18)
+	cb.toggled.connect(func(on: bool) -> void:
+		params.set(key, on)
+		_on_changed())
+	parent.add_child(cb)
+	return cb
+
+
+## チェックボックスと、チェックが入っているときだけ表示する行の入れ物を作る
+func _toggle_rows(parent: Control, text: String, key: String) -> VBoxContainer:
+	var cb := _check(parent, text, key)
+	var rows := VBoxContainer.new()
+	rows.add_theme_constant_override("separation", 6)
+	rows.visible = cb.button_pressed
+	cb.toggled.connect(func(on: bool) -> void: rows.visible = on)
+	parent.add_child(rows)
+	return rows
 
 
 func _number_row(parent: Control, spec: Array) -> void:
@@ -309,9 +450,15 @@ func _on_changed() -> void:
 func _update_summary() -> void:
 	var p := params
 	var slots := p.active_ingredients().size()
-	summary_label.text = "計算に使う値：おてつだい時間 %d秒（げんき81以上で %d秒）・食材 %.1f%%・スキル %.1f%%・最大所持数 %d・きのみ %d個・食材枠 %d枠" % [
+	var text := "計算に使う値：おてつだい時間 %d秒（げんき81以上で %d秒）・食材 %.1f%%・スキル %.1f%%・最大所持数 %d・きのみ %d個・食材枠 %d枠" % [
 		int(p.help_sec()), int(floor(p.help_sec() * 0.45)), p.ingredient_chance() * 100.0,
 		p.skill_chance() * 100.0, p.carry_limit(), p.berry_amount(), slots]
+	var ing_add := p.ingredient_amount({"amount": 0})
+	if ing_add > 0:
+		text += "・食材の数 +%d個" % ing_add
+	if p.has_extra_ingredient():
+		text += "（%.1f%%で さらに+%d個）" % [p.ex_extra_ingredient_prob * 100.0, p.ex_extra_ingredient]
+	summary_label.text = text
 
 
 # ---------------------------------------------------------------- 見た目
@@ -379,8 +526,28 @@ func _make_theme(base: Theme) -> Theme:
 	t.set_stylebox("hover", "Button", _box(Color("ffe9bf").lightened(0.08), 14, 8))
 	t.set_stylebox("pressed", "Button", _box(Color("ffe9bf").darkened(0.12), 14, 8))
 	t.set_stylebox("focus", "Button", StyleBoxEmpty.new())
+	t.set_stylebox("disabled", "Button", _box(Color("ffe9bf").lightened(0.4), 14, 8))
 	for key in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
 		t.set_color(key, "Button", TEXT_DARK)
+	t.set_color("font_disabled_color", "Button", Color(TEXT_DARK, 0.35))
+
+	# 設定名のプルダウン
+	var opt := _box(Color.WHITE, 12, 10)
+	opt.set_border_width_all(2)
+	opt.border_color = LINE
+	for st in ["normal", "hover", "pressed", "focus", "disabled"]:
+		t.set_stylebox(st, "OptionButton", opt)
+	for key in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
+		t.set_color(key, "OptionButton", TEXT_DARK)
+	t.set_color("modulate_arrow", "OptionButton", TEXT_SUB)
+	var menu := _box(CREAM, 12, 10)
+	menu.set_border_width_all(2)
+	menu.border_color = LINE
+	t.set_stylebox("panel", "PopupMenu", menu)
+	t.set_stylebox("hover", "PopupMenu", _box(Color("ffe9bf"), 8, 4))
+	for key in ["font_color", "font_hover_color", "font_accelerator_color"]:
+		t.set_color(key, "PopupMenu", TEXT_DARK)
+	t.set_constant("v_separation", "PopupMenu", 14)
 
 	var flat := StyleBoxEmpty.new()
 	flat.content_margin_top = 6
