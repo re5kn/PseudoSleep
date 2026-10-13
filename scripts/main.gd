@@ -2,6 +2,7 @@ extends Node
 ## 画面全体の組み立てと操作。
 
 const Sim = preload("res://scripts/sim.gd")
+const Params = preload("res://scripts/params.gd")
 const FieldBackground = preload("res://scripts/field_background.gd")
 const PseudonView = preload("res://scripts/pseudon_view.gd")
 const ItemPile = preload("res://scripts/item_pile.gd")
@@ -12,6 +13,9 @@ const SettingsPanel = preload("res://scripts/settings_panel.gd")
 const HelpLogTable = preload("res://scripts/help_log_table.gd")
 const Desk = preload("res://scripts/desk.gd")
 const FieldClock = preload("res://scripts/field_clock.gd")
+const Fairy = preload("res://scripts/fairy.gd")
+const FairyView = preload("res://scripts/fairy_view.gd")
+const Presets = preload("res://scripts/presets.gd")
 const FONT = preload("res://fonts/MPLUSRounded1c-Bold.ttf")
 
 const VIEW_SIZE := Vector2(720, 1280)
@@ -21,6 +25,11 @@ const PILE_Y := 636.0
 const PILE_GAP := 88.0
 const BOX_POS := Vector2(138, 764)
 const DESK_POS := Vector2(606, 560)
+## 妖精が漂う中心（パチモンの左右）と色
+const FAIRY_OFFSETS := [Vector2(-128, 58), Vector2(128, 58)]
+const FAIRY_COLORS := [Color("ff9ccf"), Color("8fd3ff")]
+## 妖精の初期の変身先（へんしんリストの「回復役」の枠）
+const FAIRY_PRESET := 1
 const MIN_HOURS := 1
 const MAX_HOURS := 24
 const TOAST_SEC := 2.5
@@ -48,10 +57,16 @@ const PHASE_TINTS := {
 const PHASE_FADE_SEC := 0.35
 
 var sim: Sim
+var fairies: Array[Fairy] = []
+var fairy_views: Array[FairyView] = []
+## 計算条件の保存先。設定パネルと妖精の変身で共有する
+var presets: Presets
 var hours := 3
 var piles := {}
 var cutin_active := false
 var cutin_closable := false
+## カットインで「!」を出しているもの（パチモンか妖精）
+var cutin_actor: Node2D
 ## なぞり回収中か、直前の指の位置、このなぞりで回収済みの山
 var swiping := false
 var swipe_last := Vector2.ZERO
@@ -99,6 +114,13 @@ var settings_tween: Tween
 
 func _ready() -> void:
 	sim = Sim.new()
+	presets = Presets.new()
+	for i in FAIRY_OFFSETS.size():
+		var f := Fairy.new("妖精%d" % (i + 1))
+		f.preset = FAIRY_PRESET
+		presets.restore(FAIRY_PRESET, f.sim.params)
+		f.sim.reset()
+		fairies.append(f)
 	ui_theme = Theme.new()
 	ui_theme.default_font = FONT
 	ui_theme.default_font_size = 22
@@ -227,6 +249,14 @@ func _build_field() -> void:
 	pseudon = PseudonView.new()
 	pseudon.position = PSEUDON_POS
 	actor_root.add_child(pseudon)
+	for i in fairies.size():
+		var fv := FairyView.new()
+		fv.home = PSEUDON_POS + FAIRY_OFFSETS[i]
+		fv.position = fv.home
+		fv.color = FAIRY_COLORS[i]
+		fv.phase = i * 2.3
+		actor_root.add_child(fv)
+		fairy_views.append(fv)
 
 
 func _build_panel() -> void:
@@ -440,6 +470,7 @@ func _build_settings() -> void:
 			_set_settings_open(false))
 	layer.add_child(settings_scrim)
 	settings = SettingsPanel.new()
+	settings.presets = presets
 	settings.setup(sim.params, ui_theme)
 	settings.visible = false
 	settings.changed.connect(_on_params_changed)
@@ -543,6 +574,11 @@ func _on_advance() -> void:
 		return
 	_hide_box_popup()
 	sim.advance(hours * 3600.0)
+	for f in fairies:
+		if f.heals:
+			f.sim.advance(hours * 3600.0)
+		else:
+			f.sim.idle(hours * 3600.0)
 	clock.show_elapsed(sim.elapsed_sec)
 	_refresh()
 
@@ -550,6 +586,8 @@ func _on_advance() -> void:
 func _on_genki_toggled() -> void:
 	var decay := sim.genki_mode == Sim.GenkiMode.ALWAYS_HIGH
 	sim.set_genki_mode(Sim.GenkiMode.DECAY if decay else Sim.GenkiMode.ALWAYS_HIGH)
+	for f in fairies:
+		f.sim.set_genki_mode(sim.genki_mode)
 	_refresh()
 
 
@@ -557,6 +595,8 @@ func _on_reset() -> void:
 	if cutin_active:
 		return
 	sim.reset()
+	for f in fairies:
+		f.sim.reset()
 	clock.show_elapsed(sim.elapsed_sec, false)
 	for id in piles:
 		piles[id].queue_free()
@@ -612,6 +652,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		else:
 			_set_settings_open(not settings_open)
 		return
+	for i in fairies.size():
+		if fairy_views[i].hit(p):
+			if fairies[i].heals and fairies[i].sim.has_icon():
+				_on_fairy_tap(i)
+			return
 	if desk.hit(p):
 		_set_log_open(not log_open)
 		return
@@ -648,8 +693,31 @@ func _on_pseudon_tap() -> void:
 	var stock: int = result["stock"]
 	_spawn_drops(result["items"])
 	if stock > 0:
-		_start_cutin(stock, result["ceiling"])
+		_start_cutin(pseudon, stock, _skill_lines(sim.params, result["ceiling"], "肌のツヤが%dポイントアップ！" % stock))
 	_refresh()
+
+
+## 妖精をタップしたとき。持っていたきのみ・食材は消え、スキルのストックがあればパチモン・妖精のげんきを増減する
+func _on_fairy_tap(i: int) -> void:
+	var f := fairies[i]
+	var result := f.sim.drop(false)
+	var stock: int = result["stock"]
+	if stock > 0:
+		var amount := f.heal_for(stock)
+		for s in _members():
+			s.add_genki(amount)
+		var effect := "みんなのげんきが%dポイント%s！" % [absi(amount), "ダウン" if amount < 0 else "アップ"]
+		_start_cutin(fairy_views[i], stock, _skill_lines(f.sim.params, result["ceiling"], effect))
+	_refresh()
+
+
+## おてつだい中のパチモンと妖精（げんきの増減を受ける）
+func _members() -> Array[Sim]:
+	var out: Array[Sim] = [sim]
+	for f in fairies:
+		if f.heals:
+			out.append(f.sim)
+	return out
 
 
 func _collect(id: String) -> void:
@@ -731,20 +799,27 @@ func _arc(from: Vector2, to: Vector2, t: float) -> Vector2:
 
 # ---------------------------------------------------------------- メインスキルのカットイン
 
-func _start_cutin(stock: int, by_ceiling: int) -> void:
+## スキルの吹き出しの文。天井で出た分があれば「スキル天井をたたいた！」を挟む
+func _skill_lines(p: Params, by_ceiling: int, effect: String) -> PackedStringArray:
+	var lines := PackedStringArray(["%sのメインスキル！" % p.pseudon_name])
+	if by_ceiling > 0:
+		lines.append("スキル天井をたたいた！")
+	lines.append(effect)
+	return lines
+
+
+## actor（パチモンか妖精）の頭上に「!」を出してから、スキルの吹き出しを出す
+func _start_cutin(actor: Node2D, stock: int, lines: PackedStringArray) -> void:
 	cutin_active = true
 	cutin_closable = false
+	cutin_actor = actor
 	_hide_box_popup()
 	blocker.visible = true
 	create_tween().tween_property(dim, "modulate:a", 1.0, 0.15)
-	pseudon.show_exclaims(stock)
+	actor.show_exclaims(stock)
 	await get_tree().create_timer(CUTIN_PAUSE_SEC).timeout
 	if not cutin_active:
 		return
-	var lines := PackedStringArray(["%sのメインスキル！" % sim.params.pseudon_name])
-	if by_ceiling > 0:
-		lines.append("スキル天井をたたいた！")
-	lines.append("肌のツヤが%dポイントアップ！" % stock)
 	bubble_label.text = "\n".join(lines)
 	bubble.visible = true
 	bubble.scale = Vector2(0.6, 0.6)
@@ -761,7 +836,7 @@ func _end_cutin() -> void:
 	cutin_active = false
 	cutin_closable = false
 	bubble.visible = false
-	pseudon.show_exclaims(0)
+	cutin_actor.show_exclaims(0)
 	create_tween().tween_property(dim, "modulate:a", 0.0, 0.2)
 	blocker.visible = false
 
@@ -819,7 +894,12 @@ func _refresh() -> void:
 	hours_label.text = "%d時間" % hours
 	advance_button.text = "%d時間分すすめる" % hours
 	genki_button.text = "げんき：81以上で固定" if sim.genki_mode == Sim.GenkiMode.ALWAYS_HIGH else "げんき：100から減少"
-	var genki := "81以上" if sim.genki_mode == Sim.GenkiMode.ALWAYS_HIGH else str(sim.genki_at(sim.elapsed_sec))
+	var genki := "81以上"
+	if sim.genki_mode == Sim.GenkiMode.DECAY:
+		genki = str(sim.genki_at(sim.elapsed_sec))
+		for f in fairies:
+			if f.heals:
+				genki += "・%s %d" % [f.label, f.sim.genki_at(f.sim.elapsed_sec)]
 	# おてつだいの累計（リセットで 0 に戻る）
 	var t := sim.totals
 	var ceiling_hits := "（天井%d）" % t["skill_ceiling_hits"]
@@ -843,6 +923,14 @@ func _refresh() -> void:
 	pseudon.show_icon = sim.has_icon()
 	pseudon.show_menu = not pseudon.show_icon and not settings_open
 	pseudon.icon_full = sim.is_full()
+	for i in fairies.size():
+		var f := fairies[i]
+		var fv := fairy_views[i]
+		fv.active = f.heals
+		fv.show_icon = f.heals and f.sim.has_icon()
+		# 回復しない設定のときはいつも「…」
+		fv.show_menu = not fv.show_icon
+		fv.icon_full = f.sim.is_full()
 
 	var lines: Array[String] = []
 	if sim.elapsed_sec == 0.0:
