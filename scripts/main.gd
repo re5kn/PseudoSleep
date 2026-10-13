@@ -860,6 +860,9 @@ func _on_fairy_tap(i: int) -> void:
 	if stock > 0:
 		var amount := f.heal_for(stock)
 		for s in _members():
+			# 減らすときは、スキルを使った妖精自身のげんきは減らない（ほかの妖精とパチモンは減る）
+			if amount < 0 and s == f.sim:
+				continue
 			s.add_genki(amount)
 		var effect := "みんなのげんきが%dポイント%s！" % [absi(amount), "ダウン" if amount < 0 else "アップ"]
 		_start_cutin(fairy_views[i], stock, _skill_lines(f.sim.params, result["ceiling"], effect))
