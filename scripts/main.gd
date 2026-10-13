@@ -716,7 +716,7 @@ func _on_advance() -> void:
 	_hide_box_popup()
 	sim.advance(hours * 3600.0)
 	for f in fairies:
-		if f.heals:
+		if f.heals and _fairies_shown():
 			f.sim.advance(hours * 3600.0)
 		else:
 			f.sim.idle(hours * 3600.0)
@@ -729,6 +729,11 @@ func _on_genki_toggled() -> void:
 	sim.set_genki_mode(Sim.GenkiMode.DECAY if decay else Sim.GenkiMode.ALWAYS_HIGH)
 	for f in fairies:
 		f.sim.set_genki_mode(sim.genki_mode)
+		# 「81以上で固定」のあいだ妖精はいないので、出てきた時点からおてつだいを始める
+		if decay and f.heals:
+			f.sim.restart_help()
+	if not decay:
+		_hide_fairy_popup()
 	_refresh()
 
 
@@ -796,7 +801,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_set_settings_open(not settings_open)
 		return
 	for i in fairies.size():
-		if fairy_views[i].hit(p):
+		if _fairies_shown() and fairy_views[i].hit(p):
 			# アイコンが出ていなければ（回復しない設定ならいつでも）設定欄を開け閉めする
 			if fairies[i].heals and fairies[i].sim.has_icon():
 				_on_fairy_tap(i)
@@ -857,11 +862,16 @@ func _on_fairy_tap(i: int) -> void:
 	_refresh()
 
 
+## 妖精を出すか。げんきが「81以上で固定」のあいだは回復の意味がないので出さない
+func _fairies_shown() -> bool:
+	return sim.genki_mode == Sim.GenkiMode.DECAY
+
+
 ## おてつだい中のパチモンと妖精（げんきの増減を受ける）
 func _members() -> Array[Sim]:
 	var out: Array[Sim] = [sim]
 	for f in fairies:
-		if f.heals:
+		if f.heals and _fairies_shown():
 			out.append(f.sim)
 	return out
 
@@ -1072,6 +1082,7 @@ func _refresh() -> void:
 	for i in fairies.size():
 		var f := fairies[i]
 		var fv := fairy_views[i]
+		fv.visible = _fairies_shown()
 		fv.active = f.heals
 		fv.show_icon = f.heals and f.sim.has_icon()
 		# 回復しない設定のときはいつも「…」（設定欄を開いているあいだは出さない）
