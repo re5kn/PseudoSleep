@@ -110,6 +110,7 @@ var fairy_popup_index := -1
 var fairy_title: Label
 var fairy_heal_check: CheckBox
 var fairy_amount: SpinBox
+var fairy_spare_check: CheckBox
 var fairy_preset: OptionButton
 var fairy_summary: Label
 var bubble_label: Label
@@ -439,6 +440,15 @@ func _build_fairy_popup(layer: CanvasLayer) -> void:
 			fairies[fairy_popup_index].heal_amount = int(x))
 	amount_row.add_child(fairy_amount)
 
+	fairy_spare_check = CheckBox.new()
+	fairy_spare_check.text = "マイナスのときパチモンには効かない"
+	fairy_spare_check.focus_mode = Control.FOCUS_NONE
+	fairy_spare_check.add_theme_font_size_override("font_size", 18)
+	fairy_spare_check.toggled.connect(func(on: bool) -> void:
+		if fairy_popup_index >= 0:
+			fairies[fairy_popup_index].spare_pseudon = on)
+	v.add_child(fairy_spare_check)
+
 	var preset_row := HBoxContainer.new()
 	preset_row.add_theme_constant_override("separation", 8)
 	v.add_child(preset_row)
@@ -466,6 +476,7 @@ func _show_fairy_popup(i: int) -> void:
 	fairy_title.text = "%sの設定" % f.label
 	fairy_heal_check.set_pressed_no_signal(f.heals)
 	fairy_amount.set_value_no_signal(f.heal_amount)
+	fairy_spare_check.set_pressed_no_signal(f.spare_pseudon)
 	# へんしんリストは設定パネルで記憶し直せるので、開くたびに名前を取り直す
 	fairy_preset.clear()
 	for k in Presets.SLOT_COUNT:
@@ -860,8 +871,8 @@ func _on_fairy_tap(i: int) -> void:
 	if stock > 0:
 		var amount := f.heal_for(stock)
 		for s in _members():
-			# 減らすときは、スキルを使った妖精自身のげんきは減らない（ほかの妖精とパチモンは減る）
-			if amount < 0 and s == f.sim:
+			# 減らすときは、スキルを使った妖精自身のげんきは減らない（ほかの妖精は減る。パチモンは設定しだい）
+			if amount < 0 and (s == f.sim or (s == sim and f.spare_pseudon)):
 				continue
 			s.add_genki(amount)
 		var effect := "みんなのげんきが%dポイント%s！" % [absi(amount), "ダウン" if amount < 0 else "アップ"]

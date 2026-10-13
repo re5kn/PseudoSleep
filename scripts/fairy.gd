@@ -12,6 +12,8 @@ var sim: Sim
 var heals := false
 ## メインスキル1回でパチモン・妖精のげんきを増やす量（負なら減らす）
 var heal_amount := 5
+## 回復量がマイナスのとき、パチモンのげんきは減らさない
+var spare_pseudon := false
 ## 変身プルダウンで選んでいる枠
 var preset := 0
 
