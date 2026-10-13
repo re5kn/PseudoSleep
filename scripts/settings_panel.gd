@@ -162,7 +162,7 @@ func _build() -> void:
 	v.add_theme_constant_override("separation", 6)
 	scroll.add_child(v)
 
-	_section(v, "へんしん")
+	_section(v, "へんしんリスト")
 	_preset_row(v)
 
 	_section(v, "パラメータ")
