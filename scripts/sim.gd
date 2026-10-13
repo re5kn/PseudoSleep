@@ -19,12 +19,15 @@ const BERRY_BOX_MAX := 99999
 const INGREDIENT_BOX_MAX := 800
 const GENKI_START := 100
 const GENKI_DECAY_SEC := 600.0
+## メインスキルで回復できるげんきの上限
+const GENKI_MAX := 150
 
 var params: Params
 var rng := RandomNumberGenerator.new()
 var genki_mode: int = GenkiMode.ALWAYS_HIGH
-## DECAY モードでげんきが GENKI_START だった時刻
+## DECAY モードで減り始めた時刻と、そのときのげんき（メインスキルで増減すると、減る間隔はそのままこの値を足し引きする）
 var genki_origin_sec := 0.0
+var genki_base := GENKI_START
 
 var elapsed_sec := 0.0
 ## 進行中のおてつだいが終わる時刻
@@ -59,6 +62,7 @@ func _init(p: Params = null) -> void:
 func reset() -> void:
 	elapsed_sec = 0.0
 	genki_origin_sec = 0.0
+	genki_base = GENKI_START
 	pending.clear()
 	on_field.clear()
 	berry_box.clear()
@@ -89,12 +93,26 @@ func new_stats() -> Dictionary:
 func set_genki_mode(mode: int) -> void:
 	genki_mode = mode
 	genki_origin_sec = elapsed_sec
+	genki_base = GENKI_START
 
 
 func genki_at(t: float) -> int:
 	if genki_mode == GenkiMode.ALWAYS_HIGH:
 		return GENKI_START
-	return maxi(0, GENKI_START - int(floor((t - genki_origin_sec) / GENKI_DECAY_SEC)))
+	return maxi(0, genki_base - _genki_decayed(t))
+
+
+func _genki_decayed(t: float) -> int:
+	return int(floor((t - genki_origin_sec) / GENKI_DECAY_SEC))
+
+
+## 今のげんきを amount 増やす（負なら減らす。0〜GENKI_MAX）。10分ごとに減る区切りはそのまま。
+## 「81以上で固定」のときは変わらない。
+func add_genki(amount: int) -> void:
+	if genki_mode == GenkiMode.ALWAYS_HIGH:
+		return
+	var g := clampi(genki_at(elapsed_sec) + amount, 0, GENKI_MAX)
+	genki_base = g + _genki_decayed(elapsed_sec)
 
 
 static func genki_multiplier(genki: int) -> float:
@@ -125,6 +143,20 @@ func advance(seconds: float) -> Dictionary:
 	elapsed_sec = end
 	_accumulate(r)
 	return r
+
+
+## おてつだいをせずに時間だけ進める（おてつだいを休んでいる妖精用）
+func idle(seconds: float) -> void:
+	elapsed_sec += seconds
+
+
+## 今からおてつだいを始め直す。持っている分とスキルのストック・不発カウントは捨てる（げんきはそのまま）
+func restart_help() -> void:
+	pending.clear()
+	skill_stock = 0
+	skill_miss = 0
+	ceiling_stock = 0
+	next_help_at = elapsed_sec + help_interval_at(elapsed_sec)
 
 
 func _do_help(r: Dictionary, t: float) -> void:
@@ -222,13 +254,15 @@ func has_icon() -> bool:
 
 
 ## タップしたときの処理。持っている分をフィールドへ出し、スキルのストックを消費する。
-func drop() -> Dictionary:
+## to_field が false なら持っている分はフィールドへ出さずに消す（妖精用）
+func drop(to_field := true) -> Dictionary:
 	var result := {"items": pending.duplicate(), "stock": skill_stock, "ceiling": ceiling_stock}
 	var dropped := pending_count()
 	if dropped > 0 or skill_stock > 0:
 		help_log.append({"t": elapsed_sec, "tap": true, "amount": dropped, "stock": skill_stock, "ceiling": ceiling_stock})
-	for id in pending:
-		on_field[id] = int(on_field.get(id, 0)) + int(pending[id])
+	if to_field:
+		for id in pending:
+			on_field[id] = int(on_field.get(id, 0)) + int(pending[id])
 	pending.clear()
 	# メインスキルのストックがあったタップでは、不発カウントも0から数え直す
 	if skill_stock > 0:
