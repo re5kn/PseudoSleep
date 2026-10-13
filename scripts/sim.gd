@@ -145,6 +145,8 @@ func _do_help(r: Dictionary, t: float) -> void:
 		r["ingredient_helps"] += 1
 		id = ing["id"]
 		var amount := params.ingredient_amount(ing)
+		if params.has_extra_ingredient() and rng.randf() < params.ex_extra_ingredient_prob:
+			amount += params.ex_extra_ingredient
 		got = _gain(r, id, amount, room)
 	else:
 		r["berry_helps"] += 1

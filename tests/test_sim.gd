@@ -16,6 +16,7 @@ func _init() -> void:
 	_test_default_params()
 	_test_modifiers()
 	_test_event()
+	_test_ex_mode()
 	_test_slots_by_level()
 	_test_subskill_slots()
 	_test_skill_ceiling()
@@ -191,6 +192,41 @@ func _test_event() -> void:
 		if not Sim.is_tap(e) and e["id"] != "":
 			ok = ok and e["amount"] == {"ing_a": 2, "ing_b": 3, "ing_c": 5}[e["id"]]
 	check(ok and s.help_log.size() > 0, "おてつだいで食材を枠の数+1個持ってくる")
+
+
+func _test_ex_mode() -> void:
+	print("EXモード補正")
+	var p := Params.new()
+	p.ex_help_time_pct = -10.0
+	p.ex_ingredient_add = 1
+	p.ex_extra_ingredient = 2
+	p.ex_extra_ingredient_prob = 1.0
+	p.ex_skill_mult = 1.25
+	# OFF のあいだは値を入れても効かない
+	check(p.help_sec() == 1940.0 and p.ingredient_amount(p.ingredients[0]) == 1 and not p.has_extra_ingredient(), "OFF なら補正なし")
+	p.ex_on = true
+	# 2200×0.882×0.9 = 1746.36
+	check(p.help_sec() == 1746.0, "おてつだい時間−10%%は1746秒 (got %f)" % p.help_sec())
+	check(p.ingredient_amount(p.ingredients[2]) == 5 and p.has_extra_ingredient(), "食材+1個・追加あり")
+	check(_near(p.skill_chance(), 0.039 * 1.25, 1e-9), "スキル確率1.25倍")
+	p.event_on = true
+	p.event_ingredient_add = 1
+	p.event_skill_mult = 1.5
+	check(p.ingredient_amount(p.ingredients[0]) == 3, "イベントとEXモードの食材の増加数は足し算")
+	check(_near(p.skill_chance(), 0.039 * 1.5 * 1.25, 1e-9), "イベントとEXモードのスキル倍率は掛け算")
+	p.event_on = false
+	# 確率100%なら食材を拾うたびに 枠の数+1+2個
+	p.ingredient_prob = 1.0
+	p.max_carry = 1000000
+	var s := Sim.new(p)
+	s.advance(16 * 3600.0)
+	var ok := true
+	for e in s.help_log:
+		if not Sim.is_tap(e) and e["id"] != "":
+			ok = ok and e["amount"] == {"ing_a": 4, "ing_b": 5, "ing_c": 7}[e["id"]]
+	check(ok and s.help_log.size() > 0, "確率100%%なら毎回 +1+2個")
+	p.ex_extra_ingredient_prob = 0.0
+	check(not p.has_extra_ingredient(), "確率0%%なら追加なし")
 
 
 func _test_slots_by_level() -> void:

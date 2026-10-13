@@ -69,6 +69,18 @@ var event_skill_mult := 1.0
 var event_carry_add := 0
 ## イベント: 最大所持数の倍率
 var event_carry_mult := 1.0
+## EXモード補正（ON のときだけ効く）
+var ex_on := false
+## EXモード: おてつだい時間の補正（%）。−10 なら時間が 0.9倍
+var ex_help_time_pct := 0.0
+## EXモード: 1回で拾う食材の数の増加数
+var ex_ingredient_add := 0
+## EXモード: 食材をたまに追加で持ってくる数
+var ex_extra_ingredient := 0
+## EXモード: 食材を追加で持ってくる確率（食材を拾ったおてつだいごと）
+var ex_extra_ingredient_prob := 0.0
+## EXモード: スキル発生確率の倍率
+var ex_skill_mult := 1.0
 ## false にすると、レベルに関係なくすべての食材枠を使う（テスト用）
 var unlock_slots_by_level := true
 
@@ -177,12 +189,18 @@ func ribbon_carry_bonus() -> int:
 	return 0
 
 
+## EXモードのおてつだい時間の倍率
+func ex_time_factor() -> float:
+	return maxf(0.01, 1.0 + ex_help_time_pct / 100.0) if ex_on else 1.0
+
+
 ## げんき補正をかける前のおてつだい時間（秒）。
-## 基準時間×レベル補正×せいかく補正×サブスキル補正×おやすみリボン補正を掛け合わせてから小数点以下を切り捨てる。
+## 基準時間×レベル補正×せいかく補正×サブスキル補正×おやすみリボン補正×EXモード補正
+## を掛け合わせてから小数点以下を切り捨てる。
 ## せいかくの補正は時間に対して上昇 0.9倍／下降 1.075倍（スピード 1.11倍／0.93倍 に当たる）。
 func help_sec() -> float:
 	var t := base_help_sec * level_factor(level) * _nature_factor(Nature.SPEED, 0.9, 1.075) \
-		* (1.0 - speed_reduction()) * ribbon_speed_factor()
+		* (1.0 - speed_reduction()) * ribbon_speed_factor() * ex_time_factor()
 	# 0.882 などが浮動小数でわずかに小さくなり、1秒ずれないように少し足してから切り捨てる
 	return floorf(t + 1e-6)
 
@@ -198,14 +216,14 @@ func ingredient_chance() -> float:
 
 
 ## 補正後のスキル発生確率。せいかく（1.2倍／0.8倍）とスキル確率アップ（M +36%・S +18%、足し算）、
-## イベントの倍率を掛ける。
+## イベント・EXモードの倍率を掛ける。
 func skill_chance() -> float:
 	var sub := 1.0
 	if has_subskill("skill_m"):
 		sub += 0.36
 	if has_subskill("skill_s"):
 		sub += 0.18
-	var mult := event_skill_mult if event_on else 1.0
+	var mult := (event_skill_mult if event_on else 1.0) * (ex_skill_mult if ex_on else 1.0)
 	return clampf(skill_prob * _nature_factor(Nature.SKILL, 1.2, 0.8) * sub * mult, 0.0, 1.0)
 
 
@@ -232,9 +250,14 @@ func berry_amount() -> int:
 	return berries_per_help + (1 if has_subskill("berry_s") else 0) + (event_berry_add if event_on else 0)
 
 
-## 食材枠の食材を拾うときの数（イベントの増加数を足す）
+## 食材枠の食材を拾うときの数（イベント・EXモードの増加数を足す。たまに追加で持ってくる分は含まない）
 func ingredient_amount(ing: Dictionary) -> int:
-	return int(ing["amount"]) + (event_ingredient_add if event_on else 0)
+	return int(ing["amount"]) + (event_ingredient_add if event_on else 0) + (ex_ingredient_add if ex_on else 0)
+
+
+## EXモードで食材をたまに追加で持ってくるか（確率と数が 0 なら抽選しない）
+func has_extra_ingredient() -> bool:
+	return ex_on and ex_extra_ingredient > 0 and ex_extra_ingredient_prob > 0.0
 
 
 ## 今のレベルで解放されている食材枠

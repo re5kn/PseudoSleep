@@ -42,6 +42,15 @@ const EVENT_ROWS := [
 	["最大所持数の倍率", "event_carry_mult", "倍", 0.01, 10, 0.01, 1.0, 0.1],
 ]
 
+## EXモード補正の行（チェックが入っているときだけ表示）
+const EX_ROWS := [
+	["おてつだい時間の補正", "ex_help_time_pct", "%", -99, 999, 0.1, 1.0, 1],
+	["食材の数の増加数", "ex_ingredient_add", "個", 0, 99, 1, 1.0],
+	["食材をたまに追加で持ってくる数", "ex_extra_ingredient", "個", 0, 99, 1, 1.0],
+	["追加で持ってくる確率", "ex_extra_ingredient_prob", "%", 0, 100, 0.1, 100.0, 1],
+	["スキル確率の倍率", "ex_skill_mult", "倍", 0, 10, 0.01, 1.0, 0.1],
+]
+
 const NATURE_OPTIONS := [
 	[Params.Nature.SPEED, "おてつだいスピード"],
 	[Params.Nature.INGREDIENT, "食材確率"],
@@ -163,6 +172,11 @@ func _build() -> void:
 	var event_rows := _toggle_rows(v, "イベント効果", "event_on")
 	for spec in EVENT_ROWS:
 		_number_row(event_rows, spec)
+
+	_section(v, "EXモード補正")
+	var ex_rows := _toggle_rows(v, "EXモード効果", "ex_on")
+	for spec in EX_ROWS:
+		_number_row(ex_rows, spec)
 
 	_section(v, "その他")
 	_number_row(v, ["他のメンバーのおてつだいボーナス数", "other_help_bonus", "", 0, 4, 1, 1.0])
@@ -355,6 +369,8 @@ func _update_summary() -> void:
 	var ing_add := p.ingredient_amount({"amount": 0})
 	if ing_add > 0:
 		text += "・食材の数 +%d個" % ing_add
+	if p.has_extra_ingredient():
+		text += "（%.1f%%で さらに+%d個）" % [p.ex_extra_ingredient_prob * 100.0, p.ex_extra_ingredient]
 	summary_label.text = text
 
 
