@@ -81,7 +81,7 @@ func setup(p: Params, base_theme: Theme) -> void:
 	params = p
 	if presets == null:
 		presets = Presets.new()
-	theme = _make_theme(base_theme)
+	theme = make_theme(base_theme)
 	add_theme_stylebox_override("panel", _panel_style())
 	_build_all()
 
@@ -503,7 +503,8 @@ func _line_style() -> StyleBoxLine:
 	return sb
 
 
-func _make_theme(base: Theme) -> Theme:
+## 設定パネルの入力欄・ボタン・プルダウンの見た目（妖精の設定欄でも使う）
+static func make_theme(base: Theme) -> Theme:
 	var t := Theme.new()
 	t.default_font = base.default_font
 	t.default_font_size = 20

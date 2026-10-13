@@ -28,6 +28,7 @@ const DESK_POS := Vector2(606, 560)
 ## 妖精が漂う中心（パチモンの左右）と色
 const FAIRY_OFFSETS := [Vector2(-128, 58), Vector2(128, 58)]
 const FAIRY_COLORS := [Color("ff9ccf"), Color("8fd3ff")]
+const FAIRY_POPUP_W := 400.0
 ## 妖精の初期の変身先（へんしんリストの「回復役」の枠）
 const FAIRY_PRESET := 1
 const MIN_HOURS := 1
@@ -102,6 +103,14 @@ var box_popup: PanelContainer
 var box_popup_label: Label
 var box_popup_timer: SceneTreeTimer
 var bubble: PanelContainer
+## 妖精の設定欄（妖精ごとではなく1つを使い回す）。開いている妖精の番号、閉じていれば -1
+var fairy_popup: PanelContainer
+var fairy_popup_index := -1
+var fairy_title: Label
+var fairy_heal_check: CheckBox
+var fairy_amount: SpinBox
+var fairy_preset: OptionButton
+var fairy_summary: Label
 var bubble_label: Label
 var blocker: Control
 var settings: SettingsPanel
@@ -361,6 +370,8 @@ func _build_overlays() -> void:
 	bubble.add_child(bubble_label)
 	layer.add_child(bubble)
 
+	_build_fairy_popup(layer)
+
 	# カットイン中はタップをここで受け止める
 	var blocker_layer := _layer(5)
 	blocker = Control.new()
@@ -369,6 +380,136 @@ func _build_overlays() -> void:
 	blocker.visible = false
 	blocker.gui_input.connect(_on_blocker_input)
 	blocker_layer.add_child(blocker)
+
+
+## 妖精の設定欄: 回復する／しない、回復量、変身プルダウン（設定パネルと同じ見た目）。
+## 変身は保存機能がないので、項目を選んだ時点でその設定を妖精に入れる
+func _build_fairy_popup(layer: CanvasLayer) -> void:
+	fairy_popup = PanelContainer.new()
+	fairy_popup.theme = SettingsPanel.make_theme(ui_theme)
+	fairy_popup.visible = false
+	fairy_popup.custom_minimum_size = Vector2(FAIRY_POPUP_W, 0)
+	var sb := _style(CREAM, 22, 12)
+	sb.set_border_width_all(3)
+	sb.border_color = Color("e6cf9f")
+	sb.shadow_color = Color(0, 0, 0, 0.3)
+	sb.shadow_size = 8
+	fairy_popup.add_theme_stylebox_override("panel", sb)
+	layer.add_child(fairy_popup)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	fairy_popup.add_child(v)
+
+	var top := HBoxContainer.new()
+	v.add_child(top)
+	fairy_title = _label("", 22)
+	fairy_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(fairy_title)
+	var close := _button("×", Color("ffe9bf"), TEXT_DARK)
+	close.custom_minimum_size = Vector2(48, 48)
+	close.add_theme_font_size_override("font_size", 24)
+	close.pressed.connect(_hide_fairy_popup)
+	top.add_child(close)
+
+	fairy_heal_check = CheckBox.new()
+	fairy_heal_check.text = "回復する"
+	fairy_heal_check.focus_mode = Control.FOCUS_NONE
+	fairy_heal_check.add_theme_font_size_override("font_size", 18)
+	fairy_heal_check.toggled.connect(_on_fairy_heals_toggled)
+	v.add_child(fairy_heal_check)
+
+	var amount_row := HBoxContainer.new()
+	amount_row.add_theme_constant_override("separation", 6)
+	v.add_child(amount_row)
+	var amount_label := _label("回復量（マイナスで減る）", 18)
+	amount_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	amount_row.add_child(amount_label)
+	fairy_amount = SpinBox.new()
+	fairy_amount.min_value = -Sim.GENKI_MAX
+	fairy_amount.max_value = Sim.GENKI_MAX
+	fairy_amount.step = 1
+	fairy_amount.custom_minimum_size = Vector2(110, 0)
+	fairy_amount.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	fairy_amount.select_all_on_focus = true
+	fairy_amount.value_changed.connect(func(x: float) -> void:
+		if fairy_popup_index >= 0:
+			fairies[fairy_popup_index].heal_amount = int(x))
+	amount_row.add_child(fairy_amount)
+
+	var preset_row := HBoxContainer.new()
+	preset_row.add_theme_constant_override("separation", 8)
+	v.add_child(preset_row)
+	preset_row.add_child(_label("変身", 18))
+	fairy_preset = OptionButton.new()
+	fairy_preset.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	fairy_preset.focus_mode = Control.FOCUS_NONE
+	fairy_preset.fit_to_longest_item = false
+	fairy_preset.clip_text = true
+	fairy_preset.add_theme_font_size_override("font_size", 18)
+	fairy_preset.get_popup().add_theme_font_size_override("font_size", 20)
+	fairy_preset.item_selected.connect(_on_fairy_preset_selected)
+	preset_row.add_child(fairy_preset)
+
+	fairy_summary = _label("", 15)
+	fairy_summary.add_theme_color_override("font_color", Color("8a7660"))
+	fairy_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	fairy_summary.custom_minimum_size = Vector2(FAIRY_POPUP_W - 40, 0)
+	v.add_child(fairy_summary)
+
+
+func _show_fairy_popup(i: int) -> void:
+	fairy_popup_index = i
+	var f := fairies[i]
+	fairy_title.text = "%sの設定" % f.label
+	fairy_heal_check.set_pressed_no_signal(f.heals)
+	fairy_amount.set_value_no_signal(f.heal_amount)
+	# へんしんリストは設定パネルで記憶し直せるので、開くたびに名前を取り直す
+	fairy_preset.clear()
+	for k in Presets.SLOT_COUNT:
+		fairy_preset.add_item(presets.slot_name(k), k)
+		fairy_preset.set_item_disabled(k, not presets.is_saved(k))
+	fairy_preset.select(f.preset)
+	_update_fairy_summary()
+	fairy_popup.reset_size()
+	var home: Vector2 = fairy_views[i].home
+	var x := clampf(home.x - FAIRY_POPUP_W / 2, 12, VIEW_SIZE.x - FAIRY_POPUP_W - 12)
+	fairy_popup.position = Vector2(x, home.y + 52)
+	fairy_popup.visible = true
+	_refresh()
+
+
+func _hide_fairy_popup() -> void:
+	if fairy_popup_index < 0:
+		return
+	# 入力途中の回復量を確定させる
+	get_viewport().gui_release_focus()
+	fairy_popup_index = -1
+	fairy_popup.visible = false
+	_refresh()
+
+
+## 回復するにしたら今からおてつだいを始める。しないにしたら休ませる（持っている分とストックは捨てる）
+func _on_fairy_heals_toggled(on: bool) -> void:
+	var f := fairies[fairy_popup_index]
+	f.heals = on
+	f.sim.restart_help()
+	_refresh()
+
+
+func _on_fairy_preset_selected(k: int) -> void:
+	var f := fairies[fairy_popup_index]
+	if not presets.restore(k, f.sim.params):
+		return
+	f.preset = k
+	f.sim.clamp_stock()
+	_update_fairy_summary()
+	_refresh()
+
+
+func _update_fairy_summary() -> void:
+	var p := fairies[fairy_popup_index].sim.params
+	fairy_summary.text = "%s：おてつだい時間 %d秒・スキル %.1f%%・ストック %d回・連続不発上限 %d回・最大所持数 %d" % [
+		p.pseudon_name, int(p.help_sec()), p.skill_chance() * 100.0, p.max_skill_stock, p.skill_ceiling, p.carry_limit()]
 
 
 ## フィールドの机をタップすると、画面右からせり出す、おてつだい1回ごとの記録。
@@ -640,6 +781,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	swiped.clear()
 	var had_popup := box_popup.visible
 	_hide_box_popup()
+	var had_fairy_popup := fairy_popup_index
+	_hide_fairy_popup()
 	for id in piles:
 		if piles[id].hit(p):
 			swiped[id] = true
@@ -654,8 +797,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	for i in fairies.size():
 		if fairy_views[i].hit(p):
+			# アイコンが出ていなければ（回復しない設定ならいつでも）設定欄を開け閉めする
 			if fairies[i].heals and fairies[i].sim.has_icon():
 				_on_fairy_tap(i)
+			elif had_fairy_popup != i:
+				_show_fairy_popup(i)
 			return
 	if desk.hit(p):
 		_set_log_open(not log_open)
@@ -928,8 +1074,8 @@ func _refresh() -> void:
 		var fv := fairy_views[i]
 		fv.active = f.heals
 		fv.show_icon = f.heals and f.sim.has_icon()
-		# 回復しない設定のときはいつも「…」
-		fv.show_menu = not fv.show_icon
+		# 回復しない設定のときはいつも「…」（設定欄を開いているあいだは出さない）
+		fv.show_menu = not fv.show_icon and fairy_popup_index != i
 		fv.icon_full = f.sim.is_full()
 
 	var lines: Array[String] = []
