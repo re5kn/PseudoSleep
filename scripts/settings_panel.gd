@@ -3,6 +3,7 @@ extends PanelContainer
 ## 値を変えるとすぐ Params に書き込み、changed を出す（次の「すすめる」から反映される）。
 
 const Params = preload("res://scripts/params.gd")
+const Presets = preload("res://scripts/presets.gd")
 
 signal changed
 signal close_requested
@@ -59,6 +60,10 @@ const NATURE_OPTIONS := [
 ]
 
 var params: Params
+## 計算条件の保存先（設定1〜設定5）
+var presets: Presets
+var preset_select: OptionButton
+var transform_button: Button
 var summary_label: Label
 var subskill_title: Label
 ## サブスキル id → CheckBox
@@ -74,13 +79,34 @@ var down_group := ButtonGroup.new()
 
 func setup(p: Params, base_theme: Theme) -> void:
 	params = p
+	if presets == null:
+		presets = Presets.new()
 	theme = _make_theme(base_theme)
 	add_theme_stylebox_override("panel", _panel_style())
+	_build_all()
+
+
+func _build_all() -> void:
 	_build()
 	_update_nature_lock()
 	_update_subskill_boxes()
 	_update_slot_rows()
+	_update_preset_buttons()
 	_update_summary()
+
+
+## 読み込んだ設定を全部の入力欄に出し直すため、中身を作り直す
+func _rebuild() -> void:
+	for c in get_children():
+		remove_child(c)
+		c.queue_free()
+	subskill_boxes.clear()
+	number_rows.clear()
+	up_buttons.clear()
+	down_buttons.clear()
+	up_group = ButtonGroup.new()
+	down_group = ButtonGroup.new()
+	_build_all()
 
 
 # ---------------------------------------------------------------- 組み立て
@@ -136,6 +162,9 @@ func _build() -> void:
 	v.add_theme_constant_override("separation", 6)
 	scroll.add_child(v)
 
+	_section(v, "へんしん")
+	_preset_row(v)
+
 	_section(v, "パラメータ")
 	for spec in NUMBER_ROWS:
 		_number_row(v, spec)
@@ -186,6 +215,63 @@ func _build() -> void:
 	note.add_theme_color_override("font_color", TEXT_SUB)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(note)
+
+
+## [設定名のプルダウン] [変身] [記憶]
+func _preset_row(parent: Control) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	parent.add_child(row)
+	var selected := 0 if preset_select == null else preset_select.selected
+	preset_select = OptionButton.new()
+	preset_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	preset_select.focus_mode = Control.FOCUS_NONE
+	preset_select.fit_to_longest_item = false
+	preset_select.clip_text = true
+	preset_select.add_theme_font_size_override("font_size", 18)
+	preset_select.get_popup().add_theme_font_size_override("font_size", 20)
+	for i in Presets.SLOT_COUNT:
+		preset_select.add_item(presets.slot_name(i), i)
+	preset_select.select(selected)
+	preset_select.item_selected.connect(func(_i: int) -> void: _update_preset_buttons())
+	row.add_child(preset_select)
+	transform_button = _small_button("変身")
+	transform_button.pressed.connect(_on_transform)
+	row.add_child(transform_button)
+	var store := _small_button("記憶")
+	store.pressed.connect(_on_store)
+	row.add_child(store)
+
+
+func _small_button(text: String) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(76, 48)
+	b.add_theme_font_size_override("font_size", 18)
+	return b
+
+
+## 選んだ枠に保存があるときだけ変身できる
+func _update_preset_buttons() -> void:
+	transform_button.disabled = not presets.is_saved(preset_select.selected)
+
+
+## 選んだ枠の設定を呼び出し、名前欄を設定名にする
+func _on_transform() -> void:
+	if not presets.restore(preset_select.selected, params):
+		return
+	# 押したボタン自身を作り直すので、次のフレームで行う
+	_rebuild.call_deferred()
+	changed.emit()
+
+
+## 今の設定を選んだ枠に上書きで記憶する。設定名は名前欄から取る
+func _on_store() -> void:
+	var i := preset_select.selected
+	presets.store(i, params)
+	preset_select.set_item_text(i, presets.slot_name(i))
+	_update_preset_buttons()
 
 
 ## 名前は全角6文字・半角12文字まで（全角2・半角1で数えて12まで）。超えた分は後ろから削る。
@@ -440,8 +526,28 @@ func _make_theme(base: Theme) -> Theme:
 	t.set_stylebox("hover", "Button", _box(Color("ffe9bf").lightened(0.08), 14, 8))
 	t.set_stylebox("pressed", "Button", _box(Color("ffe9bf").darkened(0.12), 14, 8))
 	t.set_stylebox("focus", "Button", StyleBoxEmpty.new())
+	t.set_stylebox("disabled", "Button", _box(Color("ffe9bf").lightened(0.4), 14, 8))
 	for key in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
 		t.set_color(key, "Button", TEXT_DARK)
+	t.set_color("font_disabled_color", "Button", Color(TEXT_DARK, 0.35))
+
+	# 設定名のプルダウン
+	var opt := _box(Color.WHITE, 12, 10)
+	opt.set_border_width_all(2)
+	opt.border_color = LINE
+	for st in ["normal", "hover", "pressed", "focus", "disabled"]:
+		t.set_stylebox(st, "OptionButton", opt)
+	for key in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
+		t.set_color(key, "OptionButton", TEXT_DARK)
+	t.set_color("modulate_arrow", "OptionButton", TEXT_SUB)
+	var menu := _box(CREAM, 12, 10)
+	menu.set_border_width_all(2)
+	menu.border_color = LINE
+	t.set_stylebox("panel", "PopupMenu", menu)
+	t.set_stylebox("hover", "PopupMenu", _box(Color("ffe9bf"), 8, 4))
+	for key in ["font_color", "font_hover_color", "font_accelerator_color"]:
+		t.set_color(key, "PopupMenu", TEXT_DARK)
+	t.set_constant("v_separation", "PopupMenu", 14)
 
 	var flat := StyleBoxEmpty.new()
 	flat.content_margin_top = 6

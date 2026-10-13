@@ -7,6 +7,7 @@ extends SceneTree
 const Sim = preload("res://scripts/sim.gd")
 const Params = preload("res://scripts/params.gd")
 const FieldClock = preload("res://scripts/field_clock.gd")
+const Presets = preload("res://scripts/presets.gd")
 
 var failures := 0
 
@@ -18,6 +19,7 @@ func _init() -> void:
 	_test_event()
 	_test_ex_mode()
 	_test_camp_ticket()
+	_test_presets()
 	_test_slots_by_level()
 	_test_subskill_slots()
 	_test_skill_ceiling()
@@ -250,6 +252,48 @@ func _test_camp_ticket() -> void:
 	p.ex_help_time_pct = -10.0
 	# 2200×0.882×0.9÷1.2 = 1455.3
 	check(p.help_sec() == 1455.0, "EXモード−10%%とチケットで1455秒 (got %f)" % p.help_sec())
+
+
+func _test_presets() -> void:
+	print("計算条件のセーブ・ロード（設定1〜設定5）")
+	var path := "user://test_presets.json"
+	if FileAccess.file_exists(path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	var pr := Presets.new(path)
+	check(pr.slot_name(0) == "設定1" and pr.slot_name(4) == "設定5", "既定の設定名は設定1〜設定5")
+	check(not pr.is_saved(2), "保存前は空")
+	var p := Params.new()
+	p.pseudon_name = "ためし"
+	p.level = 33
+	p.skill_prob = 0.051
+	p.subskills = {"speed_m": true, "carry_s": true}
+	p.nature_up = Params.Nature.SKILL
+	p.ingredients[2]["amount"] = 7
+	p.event_on = true
+	p.event_carry_mult = 1.5
+	p.camp_ticket = true
+	pr.store(2, p)
+	check(pr.slot_name(2) == "ためし", "設定名は名前欄から取る")
+	# ファイルから読み直して、別の Params に戻す
+	var pr2 := Presets.new(path)
+	check(pr2.is_saved(2) and pr2.slot_name(2) == "ためし", "ファイルに残る")
+	var q := Params.new()
+	q.pseudon_name = "べつ"
+	check(pr2.restore(2, q), "変身できる")
+	check(q.pseudon_name == "ためし" and q.level == 33 and typeof(q.level) == TYPE_INT, "名前とLV（整数のまま）")
+	check(_near(q.skill_prob, 0.051, 1e-9) and q.nature_up == Params.Nature.SKILL, "スキル確率とせいかく")
+	check(q.has_subskill("speed_m") and q.has_subskill("carry_s") and q.subskills.size() == 2, "サブスキル")
+	check(q.ingredients[2]["amount"] == 7 and q.ingredients[2]["id"] == "ing_c", "食材枠の数（id はそのまま）")
+	check(q.event_on and _near(q.event_carry_mult, 1.5, 1e-9) and q.camp_ticket, "イベント・チケット")
+	check(q.help_sec() == p.help_sec() and q.carry_limit() == p.carry_limit(), "計算に使う値も同じ")
+	check(not pr2.restore(0, q) and q.pseudon_name == "ためし", "空の枠では変身しない")
+	# 常に上書き
+	p.pseudon_name = "うわがき"
+	p.level = 10
+	pr2.store(2, p)
+	var pr3 := Presets.new(path)
+	check(pr3.slot_name(2) == "うわがき" and int(pr3.slots[2]["params"]["level"]) == 10, "同じ枠は上書き")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 
 func _test_slots_by_level() -> void:

@@ -296,3 +296,53 @@ func item_name(id: String) -> String:
 
 func is_berry(id: String) -> bool:
 	return id == berry["id"]
+
+
+## 設定の保存で書き出さない項目
+const NOT_SAVED := ["berry", "unlock_slots_by_level"]
+
+
+## 保存用に、設定パネルで変えられる値をまとめて取り出す（JSON にできる形）
+func to_dict() -> Dictionary:
+	var d := {}
+	for prop in get_property_list():
+		if not (prop["usage"] & PROPERTY_USAGE_SCRIPT_VARIABLE) or prop["name"] in NOT_SAVED:
+			continue
+		var v: Variant = get(prop["name"])
+		if v is Array or v is Dictionary:
+			v = v.duplicate(true)
+		d[prop["name"]] = v
+	return d
+
+
+## to_dict で取り出した値を戻す。知らない項目や型の違う項目は無視し、ない項目は今の値のまま。
+## JSON を通ると数はすべて小数になるので、今の値の型に合わせて戻す。
+func apply_dict(d: Dictionary) -> void:
+	for key in d:
+		if key in NOT_SAVED:
+			continue
+		var cur: Variant = get(key)
+		if cur == null:
+			continue
+		var v: Variant = d[key]
+		match typeof(cur):
+			TYPE_INT:
+				if v is float or v is int:
+					set(key, int(round(v)))
+			TYPE_FLOAT:
+				if v is float or v is int:
+					set(key, float(v))
+			TYPE_BOOL:
+				if v is bool:
+					set(key, v)
+			TYPE_STRING:
+				if v is String:
+					set(key, clip_name(v) if key == "pseudon_name" else v)
+			TYPE_DICTIONARY:
+				if v is Dictionary:
+					set(key, v.duplicate(true))
+			TYPE_ARRAY:
+				if v is Array and key == "ingredients":
+					for i in mini(v.size(), ingredients.size()):
+						if v[i] is Dictionary and v[i].has("amount"):
+							ingredients[i]["amount"] = int(round(float(v[i]["amount"])))
