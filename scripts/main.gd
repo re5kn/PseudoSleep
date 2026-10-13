@@ -263,6 +263,7 @@ func _build_field() -> void:
 		var fv := FairyView.new()
 		fv.rest_pos = PSEUDON_POS + FAIRY_REST_OFFSETS[i]
 		fv.fly_pos = PSEUDON_POS + FAIRY_FLY_OFFSETS[i]
+		fv.droop_y = PSEUDON_POS.y + PseudonView.RIGHT_HAND.y
 		fv.position = fv.rest_pos
 		fv.color = FAIRY_COLORS[i]
 		fv.phase = i * 2.3
@@ -862,6 +863,8 @@ func _on_fairy_tap(i: int) -> void:
 			s.add_genki(amount)
 		var effect := "みんなのげんきが%dポイント%s！" % [absi(amount), "ダウン" if amount < 0 else "アップ"]
 		_start_cutin(fairy_views[i], stock, _skill_lines(f.sim.params, result["ceiling"], effect))
+	else:
+		fairy_views[i].fizzle()
 	_refresh()
 
 
