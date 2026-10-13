@@ -20,6 +20,7 @@ func _init() -> void:
 	_test_ex_mode()
 	_test_camp_ticket()
 	_test_presets()
+	_test_preset_defaults()
 	_test_slots_by_level()
 	_test_subskill_slots()
 	_test_skill_ceiling()
@@ -260,8 +261,7 @@ func _test_presets() -> void:
 	if FileAccess.file_exists(path):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 	var pr := Presets.new(path)
-	check(pr.slot_name(0) == "設定1" and pr.slot_name(4) == "設定5", "既定の設定名は設定1〜設定5")
-	check(not pr.is_saved(2), "保存前は空")
+	check(pr.slot_name(4) == "設定5" and not pr.is_saved(4), "設定5は空で、既定の設定名")
 	var p := Params.new()
 	p.pseudon_name = "ためし"
 	p.level = 33
@@ -286,7 +286,11 @@ func _test_presets() -> void:
 	check(q.ingredients[2]["amount"] == 7 and q.ingredients[2]["id"] == "ing_c", "食材枠の数（id はそのまま）")
 	check(q.event_on and _near(q.event_carry_mult, 1.5, 1e-9) and q.camp_ticket, "イベント・チケット")
 	check(q.help_sec() == p.help_sec() and q.carry_limit() == p.carry_limit(), "計算に使う値も同じ")
-	check(not pr2.restore(0, q) and q.pseudon_name == "ためし", "空の枠では変身しない")
+	check(not pr2.restore(4, q) and q.pseudon_name == "ためし", "空の枠では変身しない")
+	# ファイルには記憶した枠だけが入り、ほかの枠は初期設定のまま
+	var saved: Array = JSON.parse_string(FileAccess.get_file_as_string(path))
+	check(saved[0] == null and saved[2] is Dictionary, "初期設定の枠はファイルに書かない")
+	check(pr2.slot_name(0) == "No.25実Sいじ", "記憶していない枠は初期設定")
 	# 常に上書き
 	p.pseudon_name = "うわがき"
 	p.level = 10
@@ -294,6 +298,41 @@ func _test_presets() -> void:
 	var pr3 := Presets.new(path)
 	check(pr3.slot_name(2) == "うわがき" and int(pr3.slots[2]["params"]["level"]) == 10, "同じ枠は上書き")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+
+func _test_preset_defaults() -> void:
+	print("へんしんリストの初期設定")
+	var path := "user://test_presets_defaults.json"
+	if FileAccess.file_exists(path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	var pr := Presets.new(path)
+	var names := []
+	for i in Presets.SLOT_COUNT:
+		names.append(pr.slot_name(i))
+	check(names == ["No.25実Sいじ", "回復役", "本島EXバフ", "砂浜EXデバフ", "設定5"], "設定名 (got %s)" % str(names))
+	check(pr.is_saved(0) and pr.is_saved(3) and not pr.is_saved(4), "設定1〜4は変身でき、設定5は空")
+	var p := Params.new()
+	pr.restore(0, p)
+	check(p.pseudon_name == "No.25実Sいじ" and p.level == 25 and p.base_help_sec == 2700.0, "設定1: 名前・LV25・2700秒")
+	check(_near(p.ingredient_prob, 0.207, 1e-9) and _near(p.skill_prob, 0.021, 1e-9), "設定1: 食材20.7%%・スキル2.1%%")
+	check(p.skill_ceiling == 78 and p.max_skill_stock == 1 and p.max_carry == 22 and p.berries_per_help == 2, "設定1: 天井78・ストック1・所持22・きのみ2")
+	check(p.ingredients[0]["amount"] == 1 and p.evolutions_left == 1 and p.ribbon_sleep_hours == 0, "設定1: 食材1の数1・進化1回・睡眠0")
+	check(p.subskills.keys() == ["berry_s"], "設定1: きのみの数S")
+	check(p.nature_up == Params.Nature.SPEED and p.nature_down == Params.Nature.INGREDIENT, "設定1: スピード↑食材↓")
+	check(not p.ex_on and not p.event_on, "設定1: 補正なし")
+	pr.restore(1, p)
+	check(p.pseudon_name == "回復役" and p.level == 25 and p.base_help_sec == 4000.0, "設定2: 名前・LV25・4000秒")
+	check(_near(p.ingredient_prob, 0.25, 1e-9) and _near(p.skill_prob, 0.02, 1e-9), "設定2: 食材25%%・スキル2%%")
+	check(p.skill_ceiling == 40 and p.max_skill_stock == 2 and p.max_carry == 13 and p.berries_per_help == 1, "設定2: 天井40・ストック2・所持13・きのみ1")
+	check(p.evolutions_left == 1 and p.subskills.is_empty() and p.nature_up == Params.Nature.NONE and p.nature_down == Params.Nature.NONE, "設定2: 進化1回・サブスキルとせいかくなし")
+	var base := Params.new()
+	pr.restore(2, p)
+	check(p.pseudon_name == "本島EXバフ" and p.level == base.level and p.base_help_sec == base.base_help_sec, "設定3: パラメータはベアビヲ9と同じ")
+	check(p.ex_on and _near(p.ex_help_time_pct, -10.0, 1e-9) and _near(p.ex_skill_mult, 1.25, 1e-9), "設定3: EX −10%%・スキル1.25倍")
+	pr.restore(3, p)
+	check(p.pseudon_name == "砂浜EXデバフ" and p.ex_on and _near(p.ex_help_time_pct, 35.0, 1e-9) and _near(p.ex_skill_mult, 1.0, 1e-9), "設定4: EX +35%%")
+	# 2200×0.882×1.35 = 2619.54
+	check(p.help_sec() == 2619.0, "設定4: おてつだい時間2619秒 (got %f)" % p.help_sec())
 
 
 func _test_slots_by_level() -> void:
