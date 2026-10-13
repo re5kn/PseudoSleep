@@ -57,6 +57,18 @@ var nature_up: int = Nature.NONE
 var nature_down: int = Nature.NONE
 ## 他のメンバーが持つおてつだいボーナスの数（0〜4）
 var other_help_bonus := 0
+## イベント補正（ON のときだけ効く）
+var event_on := false
+## イベント: 1回で拾うきのみの数の増加数
+var event_berry_add := 0
+## イベント: 1回で拾う食材の数の増加数
+var event_ingredient_add := 0
+## イベント: スキル発生確率の倍率
+var event_skill_mult := 1.0
+## イベント: 最大所持数の増加数
+var event_carry_add := 0
+## イベント: 最大所持数の倍率
+var event_carry_mult := 1.0
 ## false にすると、レベルに関係なくすべての食材枠を使う（テスト用）
 var unlock_slots_by_level := true
 
@@ -185,17 +197,20 @@ func ingredient_chance() -> float:
 	return clampf(ingredient_prob * _nature_factor(Nature.INGREDIENT, 1.2, 0.8) * sub, 0.0, 1.0)
 
 
-## 補正後のスキル発生確率。せいかく（1.2倍／0.8倍）とスキル確率アップ（M +36%・S +18%、足し算）を掛ける。
+## 補正後のスキル発生確率。せいかく（1.2倍／0.8倍）とスキル確率アップ（M +36%・S +18%、足し算）、
+## イベントの倍率を掛ける。
 func skill_chance() -> float:
 	var sub := 1.0
 	if has_subskill("skill_m"):
 		sub += 0.36
 	if has_subskill("skill_s"):
 		sub += 0.18
-	return clampf(skill_prob * _nature_factor(Nature.SKILL, 1.2, 0.8) * sub, 0.0, 1.0)
+	var mult := event_skill_mult if event_on else 1.0
+	return clampf(skill_prob * _nature_factor(Nature.SKILL, 1.2, 0.8) * sub * mult, 0.0, 1.0)
 
 
-## 補正後の最大所持数（サブスキル L +18・M +12・S +6、おやすみリボン）
+## 補正後の最大所持数。サブスキル（L +18・M +12・S +6）・おやすみリボン・イベントの増加数を足してから、
+## イベントの倍率を掛けて小数点以下を切り上げる。
 func carry_limit() -> int:
 	var n := max_carry + ribbon_carry_bonus()
 	if has_subskill("carry_l"):
@@ -204,12 +219,22 @@ func carry_limit() -> int:
 		n += 12
 	if has_subskill("carry_s"):
 		n += 6
-	return n
+	var mult := 1.0
+	if event_on:
+		n += event_carry_add
+		mult *= event_carry_mult
+	# 倍率を掛けた値が浮動小数でわずかに大きくなり、1つ増えないように少し引いてから切り上げる
+	return maxi(1, int(ceil(n * mult - 1e-6)))
 
 
-## 1回で拾うきのみの数（きのみの数S で +1）
+## 1回で拾うきのみの数（きのみの数S で +1、イベントの増加数）
 func berry_amount() -> int:
-	return berries_per_help + (1 if has_subskill("berry_s") else 0)
+	return berries_per_help + (1 if has_subskill("berry_s") else 0) + (event_berry_add if event_on else 0)
+
+
+## 食材枠の食材を拾うときの数（イベントの増加数を足す）
+func ingredient_amount(ing: Dictionary) -> int:
+	return int(ing["amount"]) + (event_ingredient_add if event_on else 0)
 
 
 ## 今のレベルで解放されている食材枠

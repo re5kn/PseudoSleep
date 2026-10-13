@@ -15,6 +15,7 @@ func _init() -> void:
 	_test_level_factor()
 	_test_default_params()
 	_test_modifiers()
+	_test_event()
 	_test_slots_by_level()
 	_test_subskill_slots()
 	_test_skill_ceiling()
@@ -157,6 +158,39 @@ func _test_modifiers() -> void:
 	p.nature_down = Params.Nature.SKILL
 	check(_near(p.ingredient_chance(), 0.2 * 1.2 * 1.54, 1e-9), "食材確率 = 基準×せいかく1.2×(1+0.36+0.18) (got %f)" % p.ingredient_chance())
 	check(_near(p.skill_chance(), 0.05 * 0.8 * 1.18, 1e-9), "スキル確率 = 基準×せいかく0.8×(1+0.18) (got %f)" % p.skill_chance())
+
+
+func _test_event() -> void:
+	print("イベント補正")
+	var p := Params.new()
+	p.event_berry_add = 2
+	p.event_ingredient_add = 1
+	p.event_skill_mult = 1.5
+	p.event_carry_add = 10
+	p.event_carry_mult = 1.5
+	# OFF のあいだは値を入れても効かない
+	check(p.carry_limit() == 22 and p.berry_amount() == 1 and p.ingredient_amount(p.ingredients[0]) == 1, "OFF なら補正なし")
+	check(_near(p.skill_chance(), 0.039, 1e-9), "OFF ならスキル確率も変わらない")
+	p.event_on = true
+	check(p.berry_amount() == 3, "きのみ+2個 (got %d)" % p.berry_amount())
+	check(p.ingredient_amount(p.ingredients[1]) == 3, "食材+1個")
+	check(_near(p.skill_chance(), 0.039 * 1.5, 1e-9), "スキル確率1.5倍")
+	# (22+10)×1.5 = 48
+	check(p.carry_limit() == 48, "最大所持数 (22+10)×1.5=48 (got %d)" % p.carry_limit())
+	p.event_carry_add = 0
+	p.event_carry_mult = 1.1
+	# 22×1.1 = 24.2 → 25
+	check(p.carry_limit() == 25, "最大所持数 22×1.1=24.2は切り上げて25 (got %d)" % p.carry_limit())
+	# 食材を拾うたびに増加数のぶん多く持ってくる
+	p.ingredient_prob = 1.0
+	p.max_carry = 1000000
+	var s := Sim.new(p)
+	s.advance(16 * 3600.0)
+	var ok := true
+	for e in s.help_log:
+		if not Sim.is_tap(e) and e["id"] != "":
+			ok = ok and e["amount"] == {"ing_a": 2, "ing_b": 3, "ing_c": 5}[e["id"]]
+	check(ok and s.help_log.size() > 0, "おてつだいで食材を枠の数+1個持ってくる")
 
 
 func _test_slots_by_level() -> void:

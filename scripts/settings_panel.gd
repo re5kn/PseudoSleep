@@ -33,6 +33,15 @@ const NUMBER_ROWS := [
 	["睡眠時間（おやすみリボン）", "ribbon_sleep_hours", "時間", 0, 99999, 1, 1.0],
 ]
 
+## イベント補正の行（チェックが入っているときだけ表示）
+const EVENT_ROWS := [
+	["きのみの数の増加数", "event_berry_add", "個", 0, 99, 1, 1.0],
+	["食材の数の増加数", "event_ingredient_add", "個", 0, 99, 1, 1.0],
+	["スキル確率の倍率", "event_skill_mult", "倍", 0, 10, 0.01, 1.0, 0.1],
+	["最大所持数の増加数", "event_carry_add", "個", 0, 999, 1, 1.0],
+	["最大所持数の倍率", "event_carry_mult", "倍", 0.01, 10, 0.01, 1.0, 0.1],
+]
+
 const NATURE_OPTIONS := [
 	[Params.Nature.SPEED, "おてつだいスピード"],
 	[Params.Nature.INGREDIENT, "食材確率"],
@@ -150,6 +159,11 @@ func _build() -> void:
 	_nature_row(v, "上昇", up_group, up_buttons, true)
 	_nature_row(v, "下降", down_group, down_buttons, false)
 
+	_section(v, "イベント補正")
+	var event_rows := _toggle_rows(v, "イベント効果", "event_on")
+	for spec in EVENT_ROWS:
+		_number_row(event_rows, spec)
+
 	_section(v, "その他")
 	_number_row(v, ["他のメンバーのおてつだいボーナス数", "other_help_bonus", "", 0, 4, 1, 1.0])
 
@@ -192,6 +206,32 @@ func _row(parent: Control, text: String) -> HBoxContainer:
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	row.add_child(l)
 	return row
+
+
+## Params の bool 項目を切り替えるチェックボックス
+func _check(parent: Control, text: String, key: String) -> CheckBox:
+	var cb := CheckBox.new()
+	cb.text = text
+	cb.button_pressed = bool(params.get(key))
+	cb.focus_mode = Control.FOCUS_NONE
+	cb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	cb.add_theme_font_size_override("font_size", 18)
+	cb.toggled.connect(func(on: bool) -> void:
+		params.set(key, on)
+		_on_changed())
+	parent.add_child(cb)
+	return cb
+
+
+## チェックボックスと、チェックが入っているときだけ表示する行の入れ物を作る
+func _toggle_rows(parent: Control, text: String, key: String) -> VBoxContainer:
+	var cb := _check(parent, text, key)
+	var rows := VBoxContainer.new()
+	rows.add_theme_constant_override("separation", 6)
+	rows.visible = cb.button_pressed
+	cb.toggled.connect(func(on: bool) -> void: rows.visible = on)
+	parent.add_child(rows)
+	return rows
 
 
 func _number_row(parent: Control, spec: Array) -> void:
@@ -309,9 +349,13 @@ func _on_changed() -> void:
 func _update_summary() -> void:
 	var p := params
 	var slots := p.active_ingredients().size()
-	summary_label.text = "計算に使う値：おてつだい時間 %d秒（げんき81以上で %d秒）・食材 %.1f%%・スキル %.1f%%・最大所持数 %d・きのみ %d個・食材枠 %d枠" % [
+	var text := "計算に使う値：おてつだい時間 %d秒（げんき81以上で %d秒）・食材 %.1f%%・スキル %.1f%%・最大所持数 %d・きのみ %d個・食材枠 %d枠" % [
 		int(p.help_sec()), int(floor(p.help_sec() * 0.45)), p.ingredient_chance() * 100.0,
 		p.skill_chance() * 100.0, p.carry_limit(), p.berry_amount(), slots]
+	var ing_add := p.ingredient_amount({"amount": 0})
+	if ing_add > 0:
+		text += "・食材の数 +%d個" % ing_add
+	summary_label.text = text
 
 
 # ---------------------------------------------------------------- 見た目

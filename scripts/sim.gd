@@ -144,7 +144,8 @@ func _do_help(r: Dictionary, t: float) -> void:
 		var ing: Dictionary = slots[rng.randi_range(0, slots.size() - 1)]
 		r["ingredient_helps"] += 1
 		id = ing["id"]
-		got = _gain(r, id, ing["amount"], room)
+		var amount := params.ingredient_amount(ing)
+		got = _gain(r, id, amount, room)
 	else:
 		r["berry_helps"] += 1
 		id = params.berry["id"]
