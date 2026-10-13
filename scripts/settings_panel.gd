@@ -101,6 +101,14 @@ func _build() -> void:
 	summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	outer.add_child(summary_label)
 
+	var name_row := _row(outer, "名前")
+	var name_edit := LineEdit.new()
+	name_edit.text = params.pseudon_name
+	name_edit.max_length = Params.NAME_MAX_WIDTH
+	name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_edit.text_changed.connect(_on_name_changed.bind(name_edit))
+	name_row.add_child(name_edit)
+
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -109,14 +117,6 @@ func _build() -> void:
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_theme_constant_override("separation", 6)
 	scroll.add_child(v)
-
-	var name_row := _row(v, "名前")
-	var name_edit := LineEdit.new()
-	name_edit.text = params.pseudon_name
-	name_edit.max_length = Params.NAME_MAX_WIDTH
-	name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	name_edit.text_changed.connect(_on_name_changed.bind(name_edit))
-	name_row.add_child(name_edit)
 
 	_section(v, "パラメータ")
 	for spec in NUMBER_ROWS:
