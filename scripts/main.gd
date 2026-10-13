@@ -25,8 +25,9 @@ const PILE_Y := 636.0
 const PILE_GAP := 88.0
 const BOX_POS := Vector2(138, 764)
 const DESK_POS := Vector2(606, 560)
-## 妖精が漂う中心（パチモンの左右）と色
-const FAIRY_OFFSETS := [Vector2(-128, 58), Vector2(128, 58)]
+## 妖精が休む地上の位置と、回復するとき漂うパチモンの肩の高さ（パチモンの左右）、色
+const FAIRY_REST_OFFSETS := [Vector2(-128, 52), Vector2(128, 52)]
+const FAIRY_FLY_OFFSETS := [Vector2(-128, -42), Vector2(128, -42)]
 const FAIRY_COLORS := [Color("ff9ccf"), Color("8fd3ff")]
 const FAIRY_POPUP_W := 400.0
 ## 妖精の初期の変身先（へんしんリストの「回復役」の枠）
@@ -124,7 +125,7 @@ var settings_tween: Tween
 func _ready() -> void:
 	sim = Sim.new()
 	presets = Presets.new()
-	for i in FAIRY_OFFSETS.size():
+	for i in FAIRY_REST_OFFSETS.size():
 		var f := Fairy.new("妖精%d" % (i + 1))
 		f.preset = FAIRY_PRESET
 		presets.restore(FAIRY_PRESET, f.sim.params)
@@ -260,8 +261,9 @@ func _build_field() -> void:
 	actor_root.add_child(pseudon)
 	for i in fairies.size():
 		var fv := FairyView.new()
-		fv.home = PSEUDON_POS + FAIRY_OFFSETS[i]
-		fv.position = fv.home
+		fv.rest_pos = PSEUDON_POS + FAIRY_REST_OFFSETS[i]
+		fv.fly_pos = PSEUDON_POS + FAIRY_FLY_OFFSETS[i]
+		fv.position = fv.rest_pos
 		fv.color = FAIRY_COLORS[i]
 		fv.phase = i * 2.3
 		actor_root.add_child(fv)
@@ -471,9 +473,10 @@ func _show_fairy_popup(i: int) -> void:
 	fairy_preset.select(f.preset)
 	_update_fairy_summary()
 	fairy_popup.reset_size()
-	var home: Vector2 = fairy_views[i].home
-	var x := clampf(home.x - FAIRY_POPUP_W / 2, 12, VIEW_SIZE.x - FAIRY_POPUP_W - 12)
-	fairy_popup.position = Vector2(x, home.y + 52)
+	# 妖精の下に出す（休んでいる地上の位置の下。漂っていても同じ場所）
+	var at: Vector2 = fairy_views[i].rest_pos
+	var x := clampf(at.x - FAIRY_POPUP_W / 2, 12, VIEW_SIZE.x - FAIRY_POPUP_W - 12)
+	fairy_popup.position = Vector2(x, at.y + 52)
 	fairy_popup.visible = true
 	_refresh()
 
