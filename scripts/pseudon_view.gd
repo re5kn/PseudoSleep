@@ -28,6 +28,9 @@ const BOWTIE_COLORS := {
 	2: [Color(0.25, 0.5, 0.95), Color(0.08, 0.2, 0.5)],
 	3: [Color(0.98, 0.78, 0.2), Color(0.55, 0.38, 0.05)],
 }
+## 虹色の蝶ネクタイの色が1秒に一周の何割ぶん変わるかと、彩度
+const RAINBOW_SPEED := 0.4
+const RAINBOW_SAT := 0.45
 
 var show_icon := false
 ## 設定パネルを開ける印（「…」の吹き出し）を出すか
@@ -129,21 +132,21 @@ func _draw_bowtie() -> void:
 
 func _draw_rainbow_bowtie(wings: Array, knot: PackedVector2Array) -> void:
 	var c := Vector2.ZERO
-	var hue := fmod(_t * 1.6, 1.0)
+	var hue := fmod(_t * RAINBOW_SPEED, 1.0)
 	# 後ろの光の輪（色が変わりながら脈打つ）
 	var pulse := 1.0 + sin(_t * 9.0) * 0.12
 	for k in 4:
-		var col := Color.from_hsv(fmod(hue + k * 0.08, 1.0), 0.8, 1.0, 0.16)
+		var col := Color.from_hsv(fmod(hue + k * 0.08, 1.0), RAINBOW_SAT, 1.0, 0.16)
 		draw_colored_polygon(ItemArt.ellipse(c, (BOWTIE_HALF.x + 22 - k * 6) * pulse, (BOWTIE_HALF.y + 9 - k * 3) * pulse), col)
 	for i in wings.size():
 		var pts: PackedVector2Array = wings[i]
 		var cols := PackedColorArray()
 		for j in pts.size():
 			# 頂点ごとに色相をずらして、羽の上を虹色が流れるようにする
-			cols.append(Color.from_hsv(fmod(hue + i * 0.5 + j * 0.12, 1.0), 0.75, 1.0))
+			cols.append(Color.from_hsv(fmod(hue + i * 0.5 + j * 0.12, 1.0), RAINBOW_SAT, 1.0))
 		draw_polygon(pts, cols)
 		ItemArt.outline(self, pts, Color(1, 1, 1, 0.9), 2.0)
-	draw_colored_polygon(knot, Color.from_hsv(fmod(hue + 0.25, 1.0), 0.6, 1.0))
+	draw_colored_polygon(knot, Color.from_hsv(fmod(hue + 0.25, 1.0), RAINBOW_SAT * 0.8, 1.0))
 	ItemArt.outline(self, knot, Color(1, 1, 1, 0.9), 2.0)
 	# まわりを回るきらきら
 	for k in 3:
