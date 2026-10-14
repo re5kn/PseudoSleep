@@ -28,6 +28,7 @@ func _init() -> void:
 	_test_skill_miss_reset_on_tap()
 	_test_tap_log()
 	_test_add_genki()
+	_test_genki_start()
 	_test_genki_nature()
 	_test_fairy_sim()
 	_test_sleep()
@@ -482,6 +483,29 @@ func _test_tap_log() -> void:
 
 
 ## メインスキルでげんきを増減する（#26）。10分ごとに減る区切りはそのまま、0〜150
+func _test_genki_start() -> void:
+	print("げんきの初期値")
+	var s := Sim.new()
+	s.set_genki_start(60)
+	check(s.genki_at(0.0) == 100, "81以上で固定のときは初期値に関係なく変わらない")
+	s.set_genki_mode(Sim.GenkiMode.DECAY)
+	check(s.genki_at(s.elapsed_sec) == 60, "減少にすると初期値60から")
+	s.advance(1205.0)
+	check(s.genki_at(s.elapsed_sec) == 58, "20分で58")
+	s.set_genki_start(120)
+	check(s.genki_at(s.elapsed_sec) == 120, "途中で変えると今のげんきがその値から減り始め直す")
+	s.advance(600.0)
+	check(s.genki_at(s.elapsed_sec) == 119, "そこから10分で119")
+	s.reset()
+	check(s.genki_at(0.0) == 120, "リセット後も初期値から")
+	check(is_equal_approx(s.next_help_at, s.params.help_sec() * 0.45), "初期値120なら最初のおてつだいは0.45倍")
+	s.set_genki_start(30)
+	s.reset()
+	check(is_equal_approx(s.next_help_at, s.params.help_sec() * Sim.genki_multiplier(30)), "初期値30なら最初のおてつだいから30の補正")
+	s.set_genki_start(999)
+	check(s.genki_start == Sim.GENKI_MAX, "上限は150")
+
+
 func _test_add_genki() -> void:
 	print("げんきの増減")
 	var s := Sim.new()
