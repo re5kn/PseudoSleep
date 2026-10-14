@@ -18,8 +18,9 @@ const ICON_RADIUS := HeadMark.ICON_RADIUS
 const RIGHT_HAND := Vector2(-60, 2)
 ## 食材は手のひらから食材Aの幅（19px）ぶん右に出す
 const LEFT_HAND := Vector2(77, 6)
-## 蝶ネクタイ（おやすみリボン）をつける首もと（口の下）と、羽の半分の幅・高さ
+## 蝶ネクタイ（おやすみリボン）をつける首もと（口の下）と、羽の半分の幅・高さ。BOWTIE_SCALE 倍に縮めて描く
 const BOWTIE_POS := Vector2(-3, -38)
+const BOWTIE_SCALE := 0.5
 const BOWTIE_HALF := Vector2(25, 13)
 ## おやすみリボンの段階ごとの蝶ネクタイの色（[地の色, 縁の色]）。段階 4 は虹色に光るので使わない
 const BOWTIE_COLORS := {
@@ -78,6 +79,7 @@ func _draw() -> void:
 	draw_set_transform(Vector2(0, -float_y), 0.0, Vector2.ONE)
 	_draw_body()
 	if ribbon_tier > 0:
+		draw_set_transform(Vector2(0, -float_y) + BOWTIE_POS, 0.0, Vector2.ONE * BOWTIE_SCALE)
 		_draw_bowtie()
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	if show_icon:
@@ -93,9 +95,9 @@ func _draw_body() -> void:
 	draw_texture_rect(TEXTURE, Rect2(SPRITE_CENTER - size / 2, size), false)
 
 
-## 蝶ネクタイ。羽2枚と結び目を描き、段階 4 は色が流れるように変わって光る（スター状態ふう）
+## 蝶ネクタイ（BOWTIE_POS を原点にした座標）。羽2枚と結び目を描き、段階 4 は色が流れるように変わって光る（スター状態ふう）
 func _draw_bowtie() -> void:
-	var c := BOWTIE_POS
+	var c := Vector2.ZERO
 	var w := BOWTIE_HALF.x
 	var h := BOWTIE_HALF.y
 	var wings := []
@@ -126,7 +128,7 @@ func _draw_bowtie() -> void:
 
 
 func _draw_rainbow_bowtie(wings: Array, knot: PackedVector2Array) -> void:
-	var c := BOWTIE_POS
+	var c := Vector2.ZERO
 	var hue := fmod(_t * 1.6, 1.0)
 	# 後ろの光の輪（色が変わりながら脈打つ）
 	var pulse := 1.0 + sin(_t * 9.0) * 0.12
