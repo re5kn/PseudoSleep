@@ -40,6 +40,7 @@ const FAIRY_REST_OFFSETS := [Vector2(-128, 52), Vector2(128, 52)]
 const FAIRY_FLY_OFFSETS := [Vector2(-128, -42), Vector2(128, -42)]
 const FAIRY_COLORS := [Color("ff9ccf"), Color("8fd3ff")]
 const FAIRY_POPUP_W := 400.0
+const FAIRY_INFO_W := 300.0
 ## 妖精の初期の変身先（へんしんリストの「回復役」の枠）
 const FAIRY_PRESET := 1
 const MIN_HOURS := 1
@@ -133,6 +134,8 @@ var fairy_amount: SpinBox
 var fairy_target_checks: Array[CheckBox] = []
 var fairy_preset: OptionButton
 var fairy_summary: Label
+## 変身の (i) で出す説明の吹き出し
+var fairy_info: PanelContainer
 var bubble_label: Label
 ## 睡眠の設定欄（睡眠時間と「ねむる」ボタン）
 var sleep_popup: PanelContainer
@@ -499,6 +502,7 @@ func _build_fairy_popup(layer: CanvasLayer) -> void:
 	preset_row.add_theme_constant_override("separation", 8)
 	v.add_child(preset_row)
 	preset_row.add_child(_label("変身", 18))
+	preset_row.add_child(_info_button())
 	fairy_preset = OptionButton.new()
 	fairy_preset.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	fairy_preset.focus_mode = Control.FOCUS_NONE
@@ -508,11 +512,6 @@ func _build_fairy_popup(layer: CanvasLayer) -> void:
 	fairy_preset.get_popup().add_theme_font_size_override("font_size", 20)
 	fairy_preset.item_selected.connect(_on_fairy_preset_selected)
 	preset_row.add_child(fairy_preset)
-	var preset_note := _label("設定パネルで枠に「記憶」すると、その枠に変身している妖精にも反映されます。", 15)
-	preset_note.add_theme_color_override("font_color", Color("8a7660"))
-	preset_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	preset_note.custom_minimum_size = Vector2(FAIRY_POPUP_W - 40, 0)
-	v.add_child(preset_note)
 
 	var amount_row := HBoxContainer.new()
 	amount_row.add_theme_constant_override("separation", 6)
@@ -553,6 +552,54 @@ func _build_fairy_popup(layer: CanvasLayer) -> void:
 	fairy_summary.custom_minimum_size = Vector2(FAIRY_POPUP_W - 40, 0)
 	v.add_child(fairy_summary)
 
+	fairy_info = PanelContainer.new()
+	fairy_info.visible = false
+	fairy_info.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var isb := _style(Color.WHITE, 12, 8)
+	isb.set_border_width_all(2)
+	isb.border_color = Color("e6cf9f")
+	isb.shadow_color = Color(0, 0, 0, 0.2)
+	isb.shadow_size = 4
+	fairy_info.add_theme_stylebox_override("panel", isb)
+	var info_text := _label("設定パネルで枠に「記憶」すると、その枠に変身している妖精にも反映されます。", 15)
+	info_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info_text.custom_minimum_size = Vector2(FAIRY_INFO_W, 0)
+	fairy_info.add_child(info_text)
+	layer.add_child(fairy_info)
+
+
+## 「変身」の横の (i)。タップかマウスを乗せると説明の吹き出しを出す
+func _info_button() -> Button:
+	var b := Button.new()
+	b.text = "i"
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(28, 28)
+	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	b.add_theme_font_size_override("font_size", 17)
+	var color := Color("8a7660")
+	for state in ["normal", "hover", "pressed"]:
+		var sb := _style(color.lightened(0.15) if state == "hover" else color, 14, 0)
+		sb.content_margin_left = 0
+		sb.content_margin_right = 0
+		b.add_theme_stylebox_override(state, sb)
+	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	for key in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color"]:
+		b.add_theme_color_override(key, Color.WHITE)
+	# タッチでもマウスでも、押したときと乗せたときに出し、外れたら消す（タッチは他の場所を触ると外れる）
+	b.pressed.connect(_show_fairy_info.bind(b))
+	b.mouse_entered.connect(_show_fairy_info.bind(b))
+	b.mouse_exited.connect(func() -> void: fairy_info.visible = false)
+	return b
+
+
+## (i) の下に吹き出しを出す。設定欄からはみ出しても画面の中に収める
+func _show_fairy_info(b: Button) -> void:
+	fairy_info.reset_size()
+	var at := b.global_position + Vector2(b.size.x / 2 - fairy_info.size.x / 2, b.size.y + 6)
+	at.x = clampf(at.x, 12, VIEW_SIZE.x - fairy_info.size.x - 12)
+	fairy_info.position = at
+	fairy_info.visible = true
+
 
 func _show_fairy_popup(i: int) -> void:
 	fairy_popup_index = i
@@ -585,6 +632,7 @@ func _hide_fairy_popup() -> void:
 	get_viewport().gui_release_focus()
 	fairy_popup_index = -1
 	fairy_popup.visible = false
+	fairy_info.visible = false
 	_refresh()
 
 
