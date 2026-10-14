@@ -122,10 +122,11 @@ func add_genki(amount: int) -> void:
 	genki_base = g + _genki_decayed(elapsed_sec)
 
 
-## 睡眠 minutes 分で回復するげんき。8時間30分で100、せいかく（げんき回復）の倍率を掛けて四捨五入し、100まで
+## 睡眠 minutes 分で回復するげんき。補正なしでは8時間30分で100（それより長くても100）。
+## それにせいかく（げんき回復）の倍率を掛けて四捨五入する（下降なら最大88、上昇なら最大120）
 func sleep_recovery(minutes: int) -> int:
-	var x := float(minutes) / SLEEP_FULL_MIN * SLEEP_GENKI_MAX * params.genki_recovery_factor()
-	return mini(SLEEP_GENKI_MAX, int(round(x)))
+	var base := minf(SLEEP_GENKI_MAX, float(minutes) / SLEEP_FULL_MIN * SLEEP_GENKI_MAX)
+	return int(round(base * params.genki_recovery_factor()))
 
 
 ## minutes 分眠る。そのあいだもおてつだいとげんきの減少は通常どおり進み、起きた時点でげんきが回復する。

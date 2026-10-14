@@ -550,7 +550,7 @@ func _test_fairy_sim() -> void:
 	check(r["helps"] == 1, "始め直したあとはおてつだいする")
 
 
-## 睡眠: 8時間30分で100回復（せいかく補正込みで四捨五入、100まで）。眠っているあいだもおてつだいとげんきの減少は進む
+## 睡眠: 補正なしでは8時間30分で100回復（100まで）。それにせいかく補正を掛けて四捨五入。眠っているあいだもおてつだいとげんきの減少は進む
 func _test_sleep() -> void:
 	print("睡眠")
 	var s := Sim.new()
@@ -560,10 +560,12 @@ func _test_sleep() -> void:
 	check(s.sleep_recovery(600) == 100, "8時間30分より長くても100")
 	s.params.nature_up = Params.Nature.GENKI
 	check(s.sleep_recovery(240) == 56, "上昇: 47.06×1.2=56.47で56 (got %d)" % s.sleep_recovery(240))
-	check(s.sleep_recovery(450) == 100, "上昇でも100まで")
+	check(s.sleep_recovery(450) == 106, "上昇: 88.24×1.2=105.9で106 (got %d)" % s.sleep_recovery(450))
+	check(s.sleep_recovery(600) == 120, "上昇: 上限100×1.2=120 (got %d)" % s.sleep_recovery(600))
 	s.params.nature_up = Params.Nature.NONE
 	s.params.nature_down = Params.Nature.GENKI
 	check(s.sleep_recovery(510) == 88, "下降: 100×0.88=88 (got %d)" % s.sleep_recovery(510))
+	check(s.sleep_recovery(720) == 88, "下降: 長く眠っても88まで (got %d)" % s.sleep_recovery(720))
 	s.params.nature_down = Params.Nature.NONE
 
 	s.set_genki_mode(Sim.GenkiMode.DECAY)
