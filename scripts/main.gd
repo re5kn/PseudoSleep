@@ -508,6 +508,11 @@ func _build_fairy_popup(layer: CanvasLayer) -> void:
 	fairy_preset.get_popup().add_theme_font_size_override("font_size", 20)
 	fairy_preset.item_selected.connect(_on_fairy_preset_selected)
 	preset_row.add_child(fairy_preset)
+	var preset_note := _label("設定パネルで枠に「記憶」すると、その枠に変身している妖精にも反映されます。", 15)
+	preset_note.add_theme_color_override("font_color", Color("8a7660"))
+	preset_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	preset_note.custom_minimum_size = Vector2(FAIRY_POPUP_W - 40, 0)
+	v.add_child(preset_note)
 
 	var amount_row := HBoxContainer.new()
 	amount_row.add_theme_constant_override("separation", 6)
