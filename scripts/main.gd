@@ -110,7 +110,8 @@ var fairy_popup_index := -1
 var fairy_title: Label
 var fairy_heal_check: CheckBox
 var fairy_amount: SpinBox
-var fairy_spare_check: CheckBox
+## 効果の対象のチェック（パチモン・妖精1・妖精2）
+var fairy_target_checks: Array[CheckBox] = []
 var fairy_preset: OptionButton
 var fairy_summary: Label
 var bubble_label: Label
@@ -440,14 +441,20 @@ func _build_fairy_popup(layer: CanvasLayer) -> void:
 			fairies[fairy_popup_index].heal_amount = int(x))
 	amount_row.add_child(fairy_amount)
 
-	fairy_spare_check = CheckBox.new()
-	fairy_spare_check.text = "マイナスのときパチモンには効かない"
-	fairy_spare_check.focus_mode = Control.FOCUS_NONE
-	fairy_spare_check.add_theme_font_size_override("font_size", 18)
-	fairy_spare_check.toggled.connect(func(on: bool) -> void:
-		if fairy_popup_index >= 0:
-			fairies[fairy_popup_index].spare_pseudon = on)
-	v.add_child(fairy_spare_check)
+	var target_row := HBoxContainer.new()
+	target_row.add_theme_constant_override("separation", 10)
+	v.add_child(target_row)
+	target_row.add_child(_label("効果の対象", 18))
+	for k in fairies.size() + 1:
+		var cb := CheckBox.new()
+		cb.text = "パチモン" if k == 0 else fairies[k - 1].label
+		cb.focus_mode = Control.FOCUS_NONE
+		cb.add_theme_font_size_override("font_size", 17)
+		cb.toggled.connect(func(on: bool) -> void:
+			if fairy_popup_index >= 0:
+				fairies[fairy_popup_index].targets[k] = on)
+		target_row.add_child(cb)
+		fairy_target_checks.append(cb)
 
 	var preset_row := HBoxContainer.new()
 	preset_row.add_theme_constant_override("separation", 8)
@@ -476,7 +483,8 @@ func _show_fairy_popup(i: int) -> void:
 	fairy_title.text = "%sの設定" % f.label
 	fairy_heal_check.set_pressed_no_signal(f.heals)
 	fairy_amount.set_value_no_signal(f.heal_amount)
-	fairy_spare_check.set_pressed_no_signal(f.spare_pseudon)
+	for k in fairy_target_checks.size():
+		fairy_target_checks[k].set_pressed_no_signal(f.targets[k])
 	# へんしんリストは設定パネルで記憶し直せるので、開くたびに名前を取り直す
 	fairy_preset.clear()
 	for k in Presets.SLOT_COUNT:
@@ -870,12 +878,18 @@ func _on_fairy_tap(i: int) -> void:
 	var stock: int = result["stock"]
 	if stock > 0:
 		var amount := f.heal_for(stock)
-		for s in _members():
-			# 減らすときは、スキルを使った妖精自身のげんきは減らない（ほかの妖精は減る。パチモンは設定しだい）
-			if amount < 0 and (s == f.sim or (s == sim and f.spare_pseudon)):
-				continue
-			s.add_genki(amount)
-		var effect := "みんなのげんきが%dポイント%s！" % [absi(amount), "ダウン" if amount < 0 else "アップ"]
+		# 効果の対象にチェックの入っているもの（妖精は回復しているものだけ）
+		var names := PackedStringArray()
+		if f.targets[0]:
+			sim.add_genki(amount)
+			names.append("パチモン")
+		for j in fairies.size():
+			if f.targets[j + 1] and fairies[j].heals and _fairies_shown():
+				fairies[j].sim.add_genki(amount)
+				names.append(fairies[j].label)
+		var effect := "だれにも効かなかった！"
+		if not names.is_empty():
+			effect = "%sのげんきが%dポイント%s！" % ["と".join(names), absi(amount), "ダウン" if amount < 0 else "アップ"]
 		_start_cutin(fairy_views[i], stock, _skill_lines(f.sim.params, result["ceiling"], effect))
 	else:
 		# 連続不発上限に近いほど深く沈む（上限でパチモンの手の高さ）
@@ -886,15 +900,6 @@ func _on_fairy_tap(i: int) -> void:
 ## 妖精を出すか。げんきが「81以上で固定」のあいだは回復の意味がないので出さない
 func _fairies_shown() -> bool:
 	return sim.genki_mode == Sim.GenkiMode.DECAY
-
-
-## おてつだい中のパチモンと妖精（げんきの増減を受ける）
-func _members() -> Array[Sim]:
-	var out: Array[Sim] = [sim]
-	for f in fairies:
-		if f.heals and _fairies_shown():
-			out.append(f.sim)
-	return out
 
 
 func _collect(id: String) -> void:
