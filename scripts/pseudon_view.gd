@@ -31,6 +31,8 @@ const BOWTIE_COLORS := {
 ## 虹色の蝶ネクタイの色が1秒に一周の何割ぶん変わるかと、彩度
 const RAINBOW_SPEED := 0.4
 const RAINBOW_SAT := 0.45
+## 結び目のブローチ（赤い宝石）の色
+const BROOCH_COLOR := Color(0.86, 0.2, 0.26)
 
 var show_icon := false
 ## 設定パネルを開ける印（「…」の吹き出し）を出すか
@@ -136,6 +138,7 @@ func _draw_bowtie() -> void:
 		ItemArt.outline(self, wings[i], line, 2.0)
 	draw_colored_polygon(knot, fill.darkened(0.12))
 	ItemArt.outline(self, knot, line, 2.0)
+	_draw_brooch(c)
 	if ribbon_tier == 3:
 		# 金色はときどききらっと光る
 		var a := clampf(sin(_t * 2.6) * 2.0 - 1.0, 0.0, 1.0)
@@ -156,6 +159,16 @@ func _draw_rainbow_bowtie(parts: Array, knot: PackedVector2Array) -> void:
 		ItemArt.outline(self, pts, Color(1, 1, 1, 0.9), 2.0)
 	draw_colored_polygon(knot, Color.from_hsv(fmod(hue + 0.25, 1.0), RAINBOW_SAT * 0.8, 1.0))
 	ItemArt.outline(self, knot, Color(1, 1, 1, 0.9), 2.0)
+	_draw_brooch(Vector2.ZERO)
+
+
+## 結び目につける赤い宝石のブローチ。下半分を濃くして、左上に白いハイライトを入れる
+func _draw_brooch(c: Vector2) -> void:
+	var gem := ItemArt.ellipse(c, 5.5, 6.5)
+	draw_colored_polygon(gem, BROOCH_COLOR)
+	draw_colored_polygon(ItemArt.ellipse(c + Vector2(0, 2.2), 4.2, 3.6), BROOCH_COLOR.darkened(0.25))
+	draw_colored_polygon(ItemArt.ellipse(c + Vector2(-1.8, -2.4), 1.8, 1.5), Color(1, 1, 1, 0.85))
+	ItemArt.outline(self, gem, BROOCH_COLOR.darkened(0.55), 1.5)
 
 
 ## 閉じた多角形の角を切り落とす（チャイキン法）。回数を重ねるほど丸くなる
