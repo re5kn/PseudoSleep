@@ -191,6 +191,19 @@ func ribbon_carry_bonus() -> int:
 	return 0
 
 
+## おやすみリボンの段階（0: なし、1: 200時間〜、2: 500時間〜、3: 1000時間〜、4: 2000時間〜）
+func ribbon_tier() -> int:
+	if ribbon_sleep_hours >= 2000:
+		return 4
+	if ribbon_sleep_hours >= 1000:
+		return 3
+	if ribbon_sleep_hours >= 500:
+		return 2
+	if ribbon_sleep_hours >= 200:
+		return 1
+	return 0
+
+
 ## EXモードのおてつだい時間の倍率
 func ex_time_factor() -> float:
 	return maxf(0.01, 1.0 + ex_help_time_pct / 100.0) if ex_on else 1.0

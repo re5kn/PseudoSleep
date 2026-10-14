@@ -158,6 +158,12 @@ func _test_modifiers() -> void:
 	check(p.carry_limit() == 22 + 3, "リボン500時間で最大所持数+3")
 	p.ribbon_sleep_hours = 199
 	check(p.help_sec() == floorf(2400.0 * 0.882) and p.carry_limit() == 22, "200時間未満は補正なし")
+	var tiers := []
+	for h in [0, 199, 200, 499, 500, 999, 1000, 1999, 2000, 99999]:
+		p.ribbon_sleep_hours = h
+		tiers.append(p.ribbon_tier())
+	check(tiers == [0, 0, 1, 1, 2, 2, 3, 3, 4, 4], "リボンの段階は200・500・1000・2000時間で上がる (got %s)" % [tiers])
+	p.ribbon_sleep_hours = 199
 	p.subskills = {"carry_l": true, "carry_m": true, "carry_s": true, "berry_s": true}
 	check(p.carry_limit() == 22 + 18 + 12 + 6, "最大所持数アップL・M・S")
 	check(p.berry_amount() == 2, "きのみの数Sで+1個")
