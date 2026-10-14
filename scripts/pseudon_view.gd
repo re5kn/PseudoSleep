@@ -98,7 +98,7 @@ func _draw_body() -> void:
 	draw_texture_rect(TEXTURE, Rect2(SPRITE_CENTER - size / 2, size), false)
 
 
-## 蝶ネクタイ（BOWTIE_POS を原点にした座標）。羽2枚と結び目を描き、段階 4 は虹色が流れるように変わる
+## 蝶ネクタイ（BOWTIE_POS を原点にした座標）。足2本・羽2枚・結び目を描き、段階 4 は虹色が流れるように変わる
 func _draw_bowtie() -> void:
 	var c := Vector2.ZERO
 	var w := BOWTIE_HALF.x
@@ -111,12 +111,22 @@ func _draw_bowtie() -> void:
 				Vector2(w, h * 0.85), Vector2(w * 0.55, h), Vector2(4, 4)]:
 			rough.append(c + Vector2(side * p.x, p.y))
 		wings.append(_smooth(rough, 3))
+	# 結び目から下へ八の字に垂れる2本の足（端は燕尾に切り込む）
+	var tails := []
+	for side in [-1.0, 1.0]:
+		var pts := PackedVector2Array()
+		for p in [Vector2(-2, 3), Vector2(4, 3), Vector2(14, h + 11), Vector2(10, h + 8), Vector2(5, h + 13)]:
+			pts.append(c + Vector2(side * p.x, p.y))
+		tails.append(pts)
 	var knot := ItemArt.rounded_rect(c, Vector2(6, 7), 5)
 	if ribbon_tier >= 4:
-		_draw_rainbow_bowtie(wings, knot)
+		_draw_rainbow_bowtie(tails + wings, knot)
 		return
 	var fill: Color = BOWTIE_COLORS[ribbon_tier][0]
 	var line: Color = BOWTIE_COLORS[ribbon_tier][1]
+	for t in tails:
+		draw_colored_polygon(t, fill.darkened(0.06))
+		ItemArt.outline(self, t, line, 2.0)
 	for i in wings.size():
 		draw_colored_polygon(wings[i], fill)
 		# 羽のひだ（結び目から外へ広がる影）
@@ -132,15 +142,16 @@ func _draw_bowtie() -> void:
 		_draw_sparkle(c + Vector2(-w + 8, -h + 5), 7.0 * a, Color(1, 1, 0.9, a))
 
 
-func _draw_rainbow_bowtie(wings: Array, knot: PackedVector2Array) -> void:
+## parts は足と羽（描く順）。片側ずつ交互に並んでいて、左右で色相を半周ずらす
+func _draw_rainbow_bowtie(parts: Array, knot: PackedVector2Array) -> void:
 	var hue := fmod(_t * RAINBOW_SPEED, 1.0)
-	for i in wings.size():
-		var pts: PackedVector2Array = wings[i]
+	for i in parts.size():
+		var pts: PackedVector2Array = parts[i]
 		var cols := PackedColorArray()
 		for pt in pts:
 			# 位置ごとに色相をずらして、羽の上を虹色が流れるようにする
 			var shift := absf(pt.x) / BOWTIE_HALF.x * 0.3 + pt.y / BOWTIE_HALF.y * 0.12
-			cols.append(Color.from_hsv(fmod(hue + i * 0.5 + shift + 1.0, 1.0), RAINBOW_SAT, 1.0))
+			cols.append(Color.from_hsv(fmod(hue + (i % 2) * 0.5 + shift + 1.0, 1.0), RAINBOW_SAT, 1.0))
 		draw_polygon(pts, cols)
 		ItemArt.outline(self, pts, Color(1, 1, 1, 0.9), 2.0)
 	draw_colored_polygon(knot, Color.from_hsv(fmod(hue + 0.25, 1.0), RAINBOW_SAT * 0.8, 1.0))
