@@ -136,6 +136,7 @@ var fairy_preset: OptionButton
 var fairy_summary: Label
 ## 変身の (i) で出す説明の吹き出し
 var fairy_info: PanelContainer
+var fairy_info_text: Label
 var bubble_label: Label
 ## 睡眠の設定欄（睡眠時間と「ねむる」ボタン）
 var sleep_popup: PanelContainer
@@ -561,10 +562,10 @@ func _build_fairy_popup(layer: CanvasLayer) -> void:
 	isb.shadow_color = Color(0, 0, 0, 0.2)
 	isb.shadow_size = 4
 	fairy_info.add_theme_stylebox_override("panel", isb)
-	var info_text := _label("設定パネルで枠に「記憶」すると、その枠に変身している妖精にも反映されます。", 15)
-	info_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	info_text.custom_minimum_size = Vector2(FAIRY_INFO_W, 0)
-	fairy_info.add_child(info_text)
+	fairy_info_text = _label("", 15)
+	fairy_info_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	fairy_info_text.custom_minimum_size = Vector2(FAIRY_INFO_W, 0)
+	fairy_info.add_child(fairy_info_text)
 	layer.add_child(fairy_info)
 
 
@@ -594,11 +595,21 @@ func _info_button() -> Button:
 
 ## (i) の下に吹き出しを出す。設定欄からはみ出しても画面の中に収める
 func _show_fairy_info(b: Button) -> void:
+	_update_fairy_info_text()
 	fairy_info.reset_size()
 	var at := b.global_position + Vector2(b.size.x / 2 - fairy_info.size.x / 2, b.size.y + 6)
 	at.x = clampf(at.x, 12, VIEW_SIZE.x - fairy_info.size.x - 12)
 	fairy_info.position = at
 	fairy_info.visible = true
+
+
+## 吹き出しの説明。名前は今変身している枠の設定名
+func _update_fairy_info_text() -> void:
+	if fairy_popup_index < 0:
+		return
+	var slot := presets.slot_name(fairies[fairy_popup_index].preset)
+	fairy_info_text.text = "「%s」のパラメータ変更は以下の手順で行います。\n1. 設定パネルで「%s」に変身\n2. 任意のパラメータを設定\n3. 「記憶」を選択" % [slot, slot]
+	fairy_info.reset_size()
 
 
 func _show_fairy_popup(i: int) -> void:
@@ -651,6 +662,7 @@ func _on_fairy_preset_selected(k: int) -> void:
 	f.preset = k
 	f.sim.clamp_stock()
 	_update_fairy_summary()
+	_update_fairy_info_text()
 	_refresh()
 
 
