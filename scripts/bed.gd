@@ -14,8 +14,8 @@ const LINE := Color("0d2738")
 const BED_RECT := Rect2(-86, -64, 172, 118)
 const TAG_POS := Vector2(-16, -90)
 ## 天蓋付きのときの札の位置（天蓋の上に出す）とタップ範囲
-const CANOPY_TAG_POS := Vector2(-16, -146)
-const CANOPY_BED_RECT := Rect2(-86, -128, 172, 182)
+const CANOPY_TAG_POS := Vector2(26, -146)
+const CANOPY_BED_RECT := Rect2(-90, -126, 232, 226)
 ## 天蓋の柱の高さ
 const CANOPY_UP := Vector2(0, -84)
 
@@ -54,7 +54,10 @@ func _draw_bed() -> void:
 	var p := Vector2.ZERO
 	# 左下が足元、右上が枕の斜め向き。L=長さ方向、W=幅方向、H=厚み
 	var L := Vector2(110, -45)
-	var W := Vector2(52, 22)
+	# 天蓋付きは横幅2倍のダブルベッド。奥の辺はそのままで手前に広げる
+	var W := Vector2(52, 22) * (2.0 if canopy else 1.0)
+	if canopy:
+		p += Vector2(52, 22) / 2
 	var H := Vector2(0, 16)
 	var a := p - L / 2 - W / 2
 	var b := a + W
@@ -89,14 +92,15 @@ func _draw_bed() -> void:
 	draw_colored_polygon(side, Color("efe6d2"))
 	draw_colored_polygon(foot, Color("e6dcc6"))
 	draw_colored_polygon(top, Color("fffaf0"))
-	# まくら
-	var pc := a + L * 0.84 + W * 0.5 + Vector2(0, -3)
-	var pillow := PackedVector2Array()
-	for i in 20:
-		var ang := TAU * i / 20.0
-		pillow.append(pc + W.normalized() * cos(ang) * 22 + L.normalized() * sin(ang) * 8)
-	draw_colored_polygon(pillow, Color("ffffff"))
-	ItemArt.outline(self, pillow, Color("d8ccb4"), 1.5)
+	# まくら（ダブルベッドは2つ並べる）
+	for pv in ([0.27, 0.73] if canopy else [0.5]):
+		var pc: Vector2 = a + L * 0.84 + W * pv + Vector2(0, -3)
+		var pillow := PackedVector2Array()
+		for i in 20:
+			var ang := TAU * i / 20.0
+			pillow.append(pc + W.normalized() * cos(ang) * 22 + L.normalized() * sin(ang) * 8)
+		draw_colored_polygon(pillow, Color("ffffff"))
+		ItemArt.outline(self, pillow, Color("d8ccb4"), 1.5)
 	# 掛け布団（足元側を覆い、手前と足元に垂れる）
 	var k := 0.75
 	var bl_top := PackedVector2Array([a, b, b + L * k, a + L * k])
