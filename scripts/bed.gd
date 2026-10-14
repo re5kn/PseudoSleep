@@ -103,24 +103,69 @@ func _draw_bed() -> void:
 		ItemArt.outline(self, pillow, Color("d8ccb4"), 1.5)
 	# 掛け布団（足元側を覆い、手前と足元に垂れる）
 	var k := 0.75
-	var bl_top := PackedVector2Array([a, b, b + L * k, a + L * k])
-	var bl_side := PackedVector2Array([b, b + L * k, b + L * k + H * 1.25, b + H * 1.25])
-	var bl_foot := PackedVector2Array([a, b, b + H * 1.25, a + H * 1.25])
-	draw_colored_polygon(bl_side, Color("ee93b5"))
-	draw_colored_polygon(bl_foot, Color("e486aa"))
-	draw_colored_polygon(bl_top, Color("f7a8c4"))
-	draw_colored_polygon(PackedVector2Array([a + L * (k - 0.1), b + L * (k - 0.1), b + L * k, a + L * k]), Color("fcd3e1"))
-	for uv in [Vector2(0.12, 0.3), Vector2(0.22, 0.75), Vector2(0.36, 0.4), Vector2(0.46, 0.8)]:
-		draw_circle(a + L * uv.x + W * uv.y, 2.5, Color(1, 1, 1, 0.8))
-	for uv in [Vector2(0.15, 0.55), Vector2(0.4, 0.5)]:
-		draw_circle(b + L * uv.x + H * uv.y, 2.5, Color(1, 1, 1, 0.8))
-	ItemArt.outline(self, PackedVector2Array([a, b, b + H * 1.25, a + H * 1.25]), Color("d97a9e"), 1.5)
-	ItemArt.outline(self, PackedVector2Array([b, b + L * k, b + L * k + H * 1.25, b + H * 1.25]), Color("d97a9e"), 1.5)
-	ItemArt.outline(self, PackedVector2Array([a, b, b + L * k, a + L * k]), Color("d97a9e"), 1.5)
+	if canopy:
+		_draw_luxury_blanket(a, b, L, W, H, k)
+	else:
+		var bl_top := PackedVector2Array([a, b, b + L * k, a + L * k])
+		var bl_side := PackedVector2Array([b, b + L * k, b + L * k + H * 1.25, b + H * 1.25])
+		var bl_foot := PackedVector2Array([a, b, b + H * 1.25, a + H * 1.25])
+		draw_colored_polygon(bl_side, Color("ee93b5"))
+		draw_colored_polygon(bl_foot, Color("e486aa"))
+		draw_colored_polygon(bl_top, Color("f7a8c4"))
+		draw_colored_polygon(PackedVector2Array([a + L * (k - 0.1), b + L * (k - 0.1), b + L * k, a + L * k]), Color("fcd3e1"))
+		for uv in [Vector2(0.12, 0.3), Vector2(0.22, 0.75), Vector2(0.36, 0.4), Vector2(0.46, 0.8)]:
+			draw_circle(a + L * uv.x + W * uv.y, 2.5, Color(1, 1, 1, 0.8))
+		for uv in [Vector2(0.15, 0.55), Vector2(0.4, 0.5)]:
+			draw_circle(b + L * uv.x + H * uv.y, 2.5, Color(1, 1, 1, 0.8))
+		ItemArt.outline(self, PackedVector2Array([a, b, b + H * 1.25, a + H * 1.25]), Color("d97a9e"), 1.5)
+		ItemArt.outline(self, PackedVector2Array([b, b + L * k, b + L * k + H * 1.25, b + H * 1.25]), Color("d97a9e"), 1.5)
+		ItemArt.outline(self, PackedVector2Array([a, b, b + L * k, a + L * k]), Color("d97a9e"), 1.5)
 	ItemArt.outline(self, PackedVector2Array([b + L * k, c, d, a + L * k]), Color("d8ccb4"), 1.5)
 	ItemArt.outline(self, PackedVector2Array([b + L * k + H * 1.25, b + L * k, c, c + H]), Color("d8ccb4"), 1.5)
 	if canopy:
 		_draw_canopy(a, b, c, d, H)
+
+
+## 天蓋付きのときの高級な掛け布団。ワインレッドのキルティングに金のパイピングと房飾り
+func _draw_luxury_blanket(a: Vector2, b: Vector2, L: Vector2, W: Vector2, H: Vector2, k: float) -> void:
+	var drop := H * 1.4
+	var gold := Color("e0b84c")
+	var gold_dark := Color("a8812a")
+	var top := PackedVector2Array([a, b, b + L * k, a + L * k])
+	var side := PackedVector2Array([b, b + L * k, b + L * k + drop, b + drop])
+	var foot := PackedVector2Array([a, b, b + drop, a + drop])
+	draw_colored_polygon(side, Color("7f1d3a"))
+	draw_colored_polygon(foot, Color("731834"))
+	draw_colored_polygon(top, Color("9c2a4a"))
+	# 上面のキルティング（ひし形の縫い目と金のボタン）。s は足元→枕方向、v は奥→手前
+	var at := func(sv: Vector2) -> Vector2: return a + L * k * sv.x + W * sv.y
+	var seam := Color("6e1530")
+	var step := 0.25
+	for i in range(1, 8):
+		var c := i * step
+		draw_line(at.call(Vector2(maxf(0, c - 1), minf(1, c))), at.call(Vector2(minf(1, c), maxf(0, c - 1))), seam, 1.2)
+		var d := c - 1.0
+		draw_line(at.call(Vector2(maxf(0, d), maxf(0, -d))), at.call(Vector2(minf(1, 1 + d), minf(1, 1 - d))), seam, 1.2)
+	for si in range(1, 4):
+		for vi in range(1, 4):
+			if (si + vi) % 2 == 0:
+				draw_circle(at.call(Vector2(si * step, vi * step)), 1.8, gold)
+	# 折り返した白いサテンのシーツと、その手前の金の帯
+	draw_colored_polygon(PackedVector2Array([a + L * (k - 0.1), b + L * (k - 0.1), b + L * k, a + L * k]), Color("fffaf0"))
+	draw_colored_polygon(PackedVector2Array([a + L * (k - 0.14), b + L * (k - 0.14), b + L * (k - 0.1), a + L * (k - 0.1)]), gold)
+	# 側面の金の縁取りライン
+	for e in [[a, b], [b, b + L * k]]:
+		draw_line(e[0] + drop * 0.72, e[1] + drop * 0.72, gold, 1.5)
+	# 下端の房飾り
+	for e in [[a, b, 6], [b, b + L * k, 10]]:
+		var n: int = e[2]
+		for i in n + 1:
+			var q: Vector2 = (e[0] as Vector2).lerp(e[1], float(i) / n) + drop
+			draw_line(q, q + Vector2(0, 5), gold, 2.0)
+	# 金のパイピング
+	ItemArt.outline(self, foot, gold_dark, 1.5)
+	ItemArt.outline(self, side, gold_dark, 1.5)
+	ItemArt.outline(self, top, gold, 2.0)
 
 
 ## 天蓋の柱（足の下端から天蓋まで）
