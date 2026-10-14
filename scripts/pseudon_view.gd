@@ -105,11 +105,13 @@ func _draw_bowtie() -> void:
 	var h := BOWTIE_HALF.y
 	var wings := []
 	for side in [-1.0, 1.0]:
-		wings.append(PackedVector2Array([
-			c + Vector2(side * 4, -4), c + Vector2(side * w, -h), c + Vector2(side * (w - 3), 0),
-			c + Vector2(side * w, h), c + Vector2(side * 4, 4),
-		]))
-	var knot := ItemArt.rounded_rect(c, Vector2(6, 7), 3)
+		# 角ばった羽の形を角切りでなめらかにして、ふっくら丸みのある羽にする
+		var rough := PackedVector2Array()
+		for p in [Vector2(4, -4), Vector2(w * 0.55, -h), Vector2(w, -h * 0.85), Vector2(w + 2, 0),
+				Vector2(w, h * 0.85), Vector2(w * 0.55, h), Vector2(4, 4)]:
+			rough.append(c + Vector2(side * p.x, p.y))
+		wings.append(_smooth(rough, 3))
+	var knot := ItemArt.rounded_rect(c, Vector2(6, 7), 5)
 	if ribbon_tier >= 4:
 		_draw_rainbow_bowtie(wings, knot)
 		return
@@ -119,8 +121,8 @@ func _draw_bowtie() -> void:
 		draw_colored_polygon(wings[i], fill)
 		# 羽のひだ（結び目から外へ広がる影）
 		var side := -1.0 if i == 0 else 1.0
-		draw_line(c + Vector2(side * 7, -2), c + Vector2(side * (w - 6), -h + 5), fill.darkened(0.25), 2.0)
-		draw_line(c + Vector2(side * 7, 2), c + Vector2(side * (w - 6), h - 5), fill.darkened(0.25), 2.0)
+		draw_line(c + Vector2(side * 7, -2), c + Vector2(side * (w - 8), -h + 6), fill.darkened(0.25), 2.0)
+		draw_line(c + Vector2(side * 7, 2), c + Vector2(side * (w - 8), h - 6), fill.darkened(0.25), 2.0)
 		ItemArt.outline(self, wings[i], line, 2.0)
 	draw_colored_polygon(knot, fill.darkened(0.12))
 	ItemArt.outline(self, knot, line, 2.0)
@@ -135,13 +137,27 @@ func _draw_rainbow_bowtie(wings: Array, knot: PackedVector2Array) -> void:
 	for i in wings.size():
 		var pts: PackedVector2Array = wings[i]
 		var cols := PackedColorArray()
-		for j in pts.size():
-			# 頂点ごとに色相をずらして、羽の上を虹色が流れるようにする
-			cols.append(Color.from_hsv(fmod(hue + i * 0.5 + j * 0.12, 1.0), RAINBOW_SAT, 1.0))
+		for pt in pts:
+			# 位置ごとに色相をずらして、羽の上を虹色が流れるようにする
+			var shift := absf(pt.x) / BOWTIE_HALF.x * 0.3 + pt.y / BOWTIE_HALF.y * 0.12
+			cols.append(Color.from_hsv(fmod(hue + i * 0.5 + shift + 1.0, 1.0), RAINBOW_SAT, 1.0))
 		draw_polygon(pts, cols)
 		ItemArt.outline(self, pts, Color(1, 1, 1, 0.9), 2.0)
 	draw_colored_polygon(knot, Color.from_hsv(fmod(hue + 0.25, 1.0), RAINBOW_SAT * 0.8, 1.0))
 	ItemArt.outline(self, knot, Color(1, 1, 1, 0.9), 2.0)
+
+
+## 閉じた多角形の角を切り落とす（チャイキン法）。回数を重ねるほど丸くなる
+func _smooth(pts: PackedVector2Array, times: int) -> PackedVector2Array:
+	for _k in times:
+		var out := PackedVector2Array()
+		for i in pts.size():
+			var a := pts[i]
+			var b := pts[(i + 1) % pts.size()]
+			out.append(a.lerp(b, 0.25))
+			out.append(a.lerp(b, 0.75))
+		pts = out
+	return pts
 
 
 ## 4つの角があるきらめき
