@@ -42,6 +42,8 @@ var air := 0.0
 ## スキル不発の「＞＜」を出している残り時間と、落ち込み具合（0〜1）
 var fizzle_left := 0.0
 var droop := 0.0
+## 今回の不発で沈む深さ（手の高さまでを1とした割合）
+var droop_depth := 1.0
 var _droop_tween: Tween
 var _t := 0.0
 
@@ -53,14 +55,16 @@ func _process(delta: float) -> void:
 		_t += delta
 	var drift := Vector2(sin(_t * 0.9 + phase) * 14.0, sin(_t * 1.7 + phase * 2.0) * 9.0)
 	position = rest_pos.lerp(fly_pos, _ease(air)) + drift * air
-	position.y += (droop_y - fly_pos.y) * _ease(droop) * air
+	position.y += (droop_y - fly_pos.y) * droop_depth * _ease(droop) * air
 	fizzle_left = maxf(0.0, fizzle_left - delta)
 	queue_redraw()
 
 
-## スキルが不発だったときの演出。「＞＜」を出し、右肩を落とすように傾きながらパチモンの手の高さまで沈んで、しばらくして戻る
-func fizzle() -> void:
+## スキルが不発だったときの演出。「＞＜」を出し、右肩を落とすように傾きながら沈んで、しばらくして戻る。
+## depth は沈む深さの割合（1でパチモンの手の高さ）
+func fizzle(depth: float) -> void:
 	fizzle_left = FIZZLE_SEC
+	droop_depth = clampf(depth, 0.0, 1.0)
 	if _droop_tween != null:
 		_droop_tween.kill()
 	_droop_tween = create_tween()

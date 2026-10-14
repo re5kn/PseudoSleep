@@ -878,7 +878,8 @@ func _on_fairy_tap(i: int) -> void:
 		var effect := "みんなのげんきが%dポイント%s！" % [absi(amount), "ダウン" if amount < 0 else "アップ"]
 		_start_cutin(fairy_views[i], stock, _skill_lines(f.sim.params, result["ceiling"], effect))
 	else:
-		fairy_views[i].fizzle()
+		# 連続不発上限に近いほど深く沈む（上限でパチモンの手の高さ）
+		fairy_views[i].fizzle(float(f.sim.skill_miss) / maxi(1, f.sim.params.skill_ceiling))
 	_refresh()
 
 
