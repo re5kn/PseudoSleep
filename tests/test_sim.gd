@@ -267,7 +267,7 @@ func _test_camp_ticket() -> void:
 
 
 func _test_presets() -> void:
-	print("計算条件のセーブ・ロード（設定1〜設定5）")
+	print("計算条件のセーブ・ロード（設定1〜設定6）")
 	var path := "user://test_presets.json"
 	if FileAccess.file_exists(path):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
@@ -300,6 +300,7 @@ func _test_presets() -> void:
 	check(not pr2.restore(4, q) and q.pseudon_name == "ためし", "空の枠では変身しない")
 	# ファイルには記憶した枠だけが入り、ほかの枠は初期設定のまま
 	var saved: Array = JSON.parse_string(FileAccess.get_file_as_string(path))
+	check(saved.size() == 6, "ファイルは6枠 (got %d)" % saved.size())
 	check(saved[0] == null and saved[2] is Dictionary, "初期設定の枠はファイルに書かない")
 	check(pr2.slot_name(0) == "No.25実Sいじ", "記憶していない枠は初期設定")
 	# 常に上書き
@@ -320,8 +321,8 @@ func _test_preset_defaults() -> void:
 	var names := []
 	for i in Presets.SLOT_COUNT:
 		names.append(pr.slot_name(i))
-	check(names == ["No.25実Sいじ", "回復役", "本島EXバフ", "砂浜EXデバフ", "設定5"], "設定名 (got %s)" % str(names))
-	check(pr.is_saved(0) and pr.is_saved(3) and not pr.is_saved(4), "設定1〜4は変身でき、設定5は空")
+	check(names == ["No.25実Sいじ", "回復役", "本島EXバフ", "砂浜EXデバフ", "設定5", "設定6"], "設定名 (got %s)" % str(names))
+	check(pr.is_saved(0) and pr.is_saved(3) and not pr.is_saved(4) and not pr.is_saved(5), "設定1〜4は変身でき、設定5・6は空")
 	var p := Params.new()
 	pr.restore(0, p)
 	check(p.pseudon_name == "No.25実Sいじ" and p.level == 25 and p.base_help_sec == 2700.0, "設定1: 名前・LV25・2700秒")

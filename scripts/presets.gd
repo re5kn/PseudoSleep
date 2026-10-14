@@ -1,11 +1,11 @@
 extends RefCounted
-## 計算条件の保存先（設定1〜設定5）。user:// に JSON で書く（Web ではブラウザの IndexedDB に残る）。
+## 計算条件の保存先（設定1〜設定6）。user:// に JSON で書く（Web ではブラウザの IndexedDB に残る）。
 ## ユーザーが記憶していない枠には、DEFAULTS の初期設定が入る。
 
 const Params = preload("res://scripts/params.gd")
 
 const PATH := "user://presets.json"
-const SLOT_COUNT := 5
+const SLOT_COUNT := 6
 
 ## 枠ごとの初期設定。{"name": 設定名, "params": Params の初期値から変える項目}。null の枠は空。
 ## ingredients は食材枠ごとの数の配列で書く。
@@ -60,6 +60,7 @@ const DEFAULTS := [
 			"ex_help_time_pct": 35.0,
 		},
 	},
+	null,
 	null,
 ]
 
