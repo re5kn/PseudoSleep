@@ -109,6 +109,9 @@ var log_table: HelpLogTable
 var hours_label: Label
 var advance_button: Button
 var genki_button: Button
+## げんきの初期値（「げんき：nから減少」のとき横に出す）
+var genki_start_row: HBoxContainer
+var genki_start_spin: SpinBox
 var status_label: RichTextLabel
 var toast_box: VBoxContainer
 var box_popup: PanelContainer
@@ -338,6 +341,23 @@ func _build_panel() -> void:
 	genki_button = _toggle()
 	genki_button.pressed.connect(_on_genki_toggled)
 	row2.add_child(genki_button)
+	# げんきの初期値。パチモンと妖精の両方に入る。矢印は10ずつ、入力は1単位
+	genki_start_row = HBoxContainer.new()
+	genki_start_row.add_theme_constant_override("separation", 6)
+	row2.add_child(genki_start_row)
+	genki_start_row.add_child(_label("初期値", 18))
+	genki_start_spin = SpinBox.new()
+	genki_start_spin.theme = SettingsPanel.make_theme(ui_theme)
+	genki_start_spin.min_value = 0
+	genki_start_spin.max_value = Sim.GENKI_MAX
+	genki_start_spin.step = 1
+	genki_start_spin.custom_arrow_step = 10
+	genki_start_spin.value = sim.genki_start
+	genki_start_spin.custom_minimum_size = Vector2(110, 0)
+	genki_start_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	genki_start_spin.select_all_on_focus = true
+	genki_start_spin.value_changed.connect(_on_genki_start_changed)
+	genki_start_row.add_child(genki_start_spin)
 	var reset := _button("リセット", Color("e5534b"), Color.WHITE)
 	reset.add_theme_font_size_override("font_size", 18)
 	reset.pressed.connect(_on_reset)
@@ -886,6 +906,16 @@ func _on_genki_toggled() -> void:
 	_refresh()
 
 
+## げんきの初期値を変えたとき。パチモンも妖精も、今のげんきがその値から減り始め直す
+func _on_genki_start_changed(x: float) -> void:
+	sim.set_genki_start(int(x))
+	for f in fairies:
+		f.sim.set_genki_start(int(x))
+	if sleep_popup.visible:
+		_update_sleep_popup()
+	_refresh()
+
+
 func _on_reset() -> void:
 	if cutin_active:
 		return
@@ -1208,7 +1238,8 @@ func _format_hours(sec: float) -> String:
 func _refresh() -> void:
 	hours_label.text = "%d時間" % hours
 	advance_button.text = "%d時間分すすめる" % hours
-	genki_button.text = "げんき：81以上で固定" if sim.genki_mode == Sim.GenkiMode.ALWAYS_HIGH else "げんき：100から減少"
+	genki_button.text = "げんき：81以上で固定" if sim.genki_mode == Sim.GenkiMode.ALWAYS_HIGH else "げんき：%dから減少" % sim.genki_start
+	genki_start_row.visible = sim.genki_mode == Sim.GenkiMode.DECAY
 	var genki := "81以上"
 	if sim.genki_mode == Sim.GenkiMode.DECAY:
 		genki = str(sim.genki_at(sim.elapsed_sec))
