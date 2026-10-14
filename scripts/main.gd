@@ -16,6 +16,7 @@ const FieldClock = preload("res://scripts/field_clock.gd")
 const Fairy = preload("res://scripts/fairy.gd")
 const FairyView = preload("res://scripts/fairy_view.gd")
 const Presets = preload("res://scripts/presets.gd")
+const BedBubble = preload("res://scripts/bed_bubble.gd")
 const FONT = preload("res://fonts/MPLUSRounded1c-Bold.ttf")
 
 const VIEW_SIZE := Vector2(720, 1280)
@@ -25,6 +26,13 @@ const PILE_Y := 636.0
 const PILE_GAP := 88.0
 const BOX_POS := Vector2(138, 764)
 const DESK_POS := Vector2(606, 560)
+## ベッド（背景に描いてある）の上の「ねむる」の吹き出し
+const BED_BUBBLE_POS := Vector2(462, 262)
+const SLEEP_POPUP_W := 380.0
+## 睡眠時間（分）の刻みと範囲
+const SLEEP_STEP_MIN := 30
+const SLEEP_MIN_MIN := 30
+const SLEEP_MAX_MIN := 24 * 60
 ## 妖精が休む地上の位置と、回復するとき漂うパチモンの肩の高さ（パチモンの左右）、色
 const FAIRY_REST_OFFSETS := [Vector2(-128, 52), Vector2(128, 52)]
 const FAIRY_FLY_OFFSETS := [Vector2(-128, -42), Vector2(128, -42)]
@@ -64,6 +72,8 @@ var fairy_views: Array[FairyView] = []
 ## 計算条件の保存先。設定パネルと妖精の変身で共有する
 var presets: Presets
 var hours := 3
+## 睡眠時間（分）。初期値は8時間30分（げんきが100回復する長さ）
+var sleep_minutes := Sim.SLEEP_FULL_MIN
 var piles := {}
 var cutin_active := false
 var cutin_closable := false
@@ -81,6 +91,7 @@ var actor_root: Node2D
 var pseudon: PseudonView
 var storage_box: StorageBox
 var desk: Desk
+var bed_bubble: BedBubble
 var clock: FieldClock
 var phase_tint: ColorRect
 var phase := FieldClock.phase_at(FieldClock.START_SEC)
@@ -115,6 +126,10 @@ var fairy_target_checks: Array[CheckBox] = []
 var fairy_preset: OptionButton
 var fairy_summary: Label
 var bubble_label: Label
+## 睡眠の設定欄（睡眠時間と「ねむる」ボタン）
+var sleep_popup: PanelContainer
+var sleep_time_label: Label
+var sleep_summary: Label
 var blocker: Control
 var settings: SettingsPanel
 var settings_scrim: ColorRect
@@ -223,6 +238,10 @@ func _build_field() -> void:
 	desk = Desk.new()
 	desk.position = DESK_POS
 	field.add_child(desk)
+
+	bed_bubble = BedBubble.new()
+	bed_bubble.position = BED_BUBBLE_POS
+	field.add_child(bed_bubble)
 
 	clock = FieldClock.new()
 	clock.position = CLOCK_POS
@@ -376,6 +395,7 @@ func _build_overlays() -> void:
 	layer.add_child(bubble)
 
 	_build_fairy_popup(layer)
+	_build_sleep_popup(layer)
 
 	# カットイン中はタップをここで受け止める
 	var blocker_layer := _layer(5)
@@ -533,6 +553,110 @@ func _update_fairy_summary() -> void:
 	var p := fairies[fairy_popup_index].sim.params
 	fairy_summary.text = "%s：おてつだい時間 %d秒・スキル %.1f%%・ストック %d回・連続不発上限 %d回・最大所持数 %d" % [
 		p.pseudon_name, int(p.help_sec()), p.skill_chance() * 100.0, p.max_skill_stock, p.skill_ceiling, p.carry_limit()]
+
+
+## 睡眠の設定欄: 睡眠時間（30分刻み）と「ねむる」ボタン。妖精の設定欄と同じ見た目
+func _build_sleep_popup(layer: CanvasLayer) -> void:
+	sleep_popup = PanelContainer.new()
+	sleep_popup.theme = SettingsPanel.make_theme(ui_theme)
+	sleep_popup.visible = false
+	sleep_popup.custom_minimum_size = Vector2(SLEEP_POPUP_W, 0)
+	var sb := _style(CREAM, 22, 12)
+	sb.set_border_width_all(3)
+	sb.border_color = Color("e6cf9f")
+	sb.shadow_color = Color(0, 0, 0, 0.3)
+	sb.shadow_size = 8
+	sleep_popup.add_theme_stylebox_override("panel", sb)
+	layer.add_child(sleep_popup)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	sleep_popup.add_child(v)
+
+	var top := HBoxContainer.new()
+	v.add_child(top)
+	var title := _label("睡眠", 22)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(title)
+	var close := _button("×", Color("ffe9bf"), TEXT_DARK)
+	close.custom_minimum_size = Vector2(48, 48)
+	close.add_theme_font_size_override("font_size", 24)
+	close.pressed.connect(_hide_sleep_popup)
+	top.add_child(close)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	v.add_child(row)
+	var time_title := _label("睡眠時間", 18)
+	time_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(time_title)
+	var minus := _button("－", Color("ffe9bf"), TEXT_DARK)
+	minus.custom_minimum_size = Vector2(48, 48)
+	_add_hold_repeat(minus, _change_sleep.bind(-SLEEP_STEP_MIN))
+	row.add_child(minus)
+	sleep_time_label = _label("", 20)
+	sleep_time_label.custom_minimum_size = Vector2(124, 0)
+	sleep_time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	row.add_child(sleep_time_label)
+	var plus := _button("＋", Color("ffe9bf"), TEXT_DARK)
+	plus.custom_minimum_size = Vector2(48, 48)
+	_add_hold_repeat(plus, _change_sleep.bind(SLEEP_STEP_MIN))
+	row.add_child(plus)
+
+	sleep_summary = _label("", 15)
+	sleep_summary.add_theme_color_override("font_color", Color("8a7660"))
+	sleep_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sleep_summary.custom_minimum_size = Vector2(SLEEP_POPUP_W - 40, 0)
+	v.add_child(sleep_summary)
+
+	var go := _button("ねむる", Color("6a7fd6"), Color.WHITE)
+	go.custom_minimum_size = Vector2(0, 56)
+	go.add_theme_font_size_override("font_size", 24)
+	go.pressed.connect(_on_sleep)
+	v.add_child(go)
+
+
+func _show_sleep_popup() -> void:
+	_update_sleep_popup()
+	sleep_popup.reset_size()
+	# 吹き出しの下に出す
+	var x := clampf(BED_BUBBLE_POS.x - SLEEP_POPUP_W / 2, 12, VIEW_SIZE.x - SLEEP_POPUP_W - 12)
+	sleep_popup.position = Vector2(x, BED_BUBBLE_POS.y + 60)
+	sleep_popup.visible = true
+
+
+func _hide_sleep_popup() -> void:
+	sleep_popup.visible = false
+
+
+func _change_sleep(delta: int) -> void:
+	sleep_minutes = clampi(sleep_minutes + delta, SLEEP_MIN_MIN, SLEEP_MAX_MIN)
+	_update_sleep_popup()
+
+
+## 起きたときに回復する量（せいかく補正込み）を眠るもの（パチモンと回復する妖精）ごとに出す
+func _update_sleep_popup() -> void:
+	sleep_time_label.text = "%d時間%02d分" % [sleep_minutes / 60, sleep_minutes % 60]
+	if sim.genki_mode == Sim.GenkiMode.ALWAYS_HIGH:
+		sleep_summary.text = "げんきは81以上で固定のため回復しません。おてつだいは進みます。"
+		return
+	var parts := PackedStringArray(["パチモン +%d" % sim.sleep_recovery(sleep_minutes)])
+	for f in fairies:
+		if f.heals:
+			parts.append("%s +%d" % [f.label, f.sim.sleep_recovery(sleep_minutes)])
+	sleep_summary.text = "起きたときのげんき回復（100まで）：%s" % "・".join(parts)
+
+
+## 眠る。そのあいだもおてつだいは進み、起きた時点でげんきが回復する。妖精は回復するものだけが眠る
+func _on_sleep() -> void:
+	if cutin_active:
+		return
+	_hide_sleep_popup()
+	_hide_box_popup()
+	sim.sleep(sleep_minutes)
+	for f in fairies:
+		f.sim.sleep(sleep_minutes, f.heals and _fairies_shown())
+	clock.show_elapsed(sim.elapsed_sec)
+	_refresh()
 
 
 ## フィールドの机をタップすると、画面右からせり出す、おてつだい1回ごとの記録。
@@ -757,6 +881,8 @@ func _on_genki_toggled() -> void:
 			f.sim.restart_help()
 	if not decay:
 		_hide_fairy_popup()
+	if sleep_popup.visible:
+		_update_sleep_popup()
 	_refresh()
 
 
@@ -773,6 +899,7 @@ func _on_reset() -> void:
 	for t in toast_box.get_children():
 		t.queue_free()
 	_hide_box_popup()
+	_hide_sleep_popup()
 	_refresh()
 
 
@@ -811,6 +938,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	_hide_box_popup()
 	var had_fairy_popup := fairy_popup_index
 	_hide_fairy_popup()
+	var had_sleep_popup := sleep_popup.visible
+	_hide_sleep_popup()
 	for id in piles:
 		if piles[id].hit(p):
 			swiped[id] = true
@@ -831,6 +960,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			elif had_fairy_popup != i:
 				_show_fairy_popup(i)
 			return
+	if bed_bubble.hit(p):
+		if not had_sleep_popup:
+			_show_sleep_popup()
+		return
 	if desk.hit(p):
 		_set_log_open(not log_open)
 		return
