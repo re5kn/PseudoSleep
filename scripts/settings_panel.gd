@@ -60,7 +60,7 @@ const NATURE_OPTIONS := [
 ]
 
 var params: Params
-## 計算条件の保存先（設定1〜設定5）
+## 計算条件の保存先（設定1〜設定6）
 var presets: Presets
 var preset_select: OptionButton
 var transform_button: Button

@@ -1,33 +1,18 @@
 extends RefCounted
-## 計算条件の保存先（設定1〜設定5）。user:// に JSON で書く（Web ではブラウザの IndexedDB に残る）。
+## 計算条件の保存先（設定1〜設定6）。user:// に JSON で書く（Web ではブラウザの IndexedDB に残る）。
 ## ユーザーが記憶していない枠には、DEFAULTS の初期設定が入る。
 
 const Params = preload("res://scripts/params.gd")
 
 const PATH := "user://presets.json"
-const SLOT_COUNT := 5
+const SLOT_COUNT := 6
 
 ## 枠ごとの初期設定。{"name": 設定名, "params": Params の初期値から変える項目}。null の枠は空。
 ## ingredients は食材枠ごとの数の配列で書く。
 const DEFAULTS := [
 	{
-		"name": "No.25実Sいじ",
-		"params": {
-			"level": 25,
-			"base_help_sec": 2700.0,
-			"ingredient_prob": 0.207,
-			"skill_prob": 0.021,
-			"skill_ceiling": 78,
-			"max_skill_stock": 1,
-			"max_carry": 22,
-			"berries_per_help": 2,
-			"ingredients": [1],
-			"evolutions_left": 1,
-			"ribbon_sleep_hours": 0,
-			"subskills": {"berry_s": true},
-			"nature_up": Params.Nature.SPEED,
-			"nature_down": Params.Nature.INGREDIENT,
-		},
+		"name": "ベアビヲ9",
+		"params": {},
 	},
 	{
 		"name": "回復役",
@@ -58,6 +43,25 @@ const DEFAULTS := [
 		"params": {
 			"ex_on": true,
 			"ex_help_time_pct": 35.0,
+		},
+	},
+	{
+		"name": "No.25実Sいじ",
+		"params": {
+			"level": 25,
+			"base_help_sec": 2700.0,
+			"ingredient_prob": 0.207,
+			"skill_prob": 0.021,
+			"skill_ceiling": 78,
+			"max_skill_stock": 1,
+			"max_carry": 22,
+			"berries_per_help": 2,
+			"ingredients": [1],
+			"evolutions_left": 1,
+			"ribbon_sleep_hours": 0,
+			"subskills": {"berry_s": true},
+			"nature_up": Params.Nature.SPEED,
+			"nature_down": Params.Nature.INGREDIENT,
 		},
 	},
 	null,
