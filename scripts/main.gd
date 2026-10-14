@@ -26,7 +26,7 @@ const PILE_Y := 636.0
 const PILE_GAP := 88.0
 const BOX_POS := Vector2(138, 764)
 const DESK_POS := Vector2(606, 560)
-## ベッド（背景に描いてある）の上の「ねむる」の札
+## ベッド（背景に描いてある）の上の「ねむる」の札（タップ範囲はベッドも含む）
 const BED_TAG_POS := Vector2(462, 262)
 const SLEEP_POPUP_W := 380.0
 ## 睡眠時間（分）の刻みと範囲
