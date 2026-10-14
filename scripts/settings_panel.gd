@@ -443,6 +443,11 @@ func _on_changed() -> void:
 	changed.emit()
 
 
+## 画面下部のチーム全体の設定を変えたときに、計算に使う値を出し直す
+func refresh_summary() -> void:
+	_update_summary()
+
+
 func _update_summary() -> void:
 	var p := params
 	var slots := p.active_ingredients().size()
