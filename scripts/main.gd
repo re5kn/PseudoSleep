@@ -253,6 +253,7 @@ func _build_field() -> void:
 
 	bed = Bed.new()
 	bed.position = BED_POS
+	bed.canopy = sim.params.camp_ticket
 	field.add_child(bed)
 
 	clock = FieldClock.new()
@@ -929,6 +930,7 @@ func _set_team(key: String, value: Variant) -> void:
 	for s in all:
 		s.params.set(key, value)
 		s.clamp_stock()
+	bed.canopy = sim.params.camp_ticket
 	settings.refresh_summary()
 	if fairy_popup_index >= 0:
 		_update_fairy_summary()

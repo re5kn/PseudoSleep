@@ -1,6 +1,7 @@
 extends Node2D
 ## ベッドと、その上に出す「ねむる」の角丸四角形。どちらかをタップすると睡眠の設定欄を開く。
 ## 机や収容箱と同じく背景とは別に描き、夕方・夜の色合いを重ねない。
+## いいキャンプチケットが有効なときは天蓋付きのベッドになる（見た目だけ）。
 
 const ItemArt = preload("res://scripts/item_art.gd")
 const FONT = preload("res://fonts/MPLUSRounded1c-Bold.ttf")
@@ -12,7 +13,14 @@ const LINE := Color("0d2738")
 ## ベッドのタップ範囲（ベッドの中心からの相対）と、「ねむる」の札の位置
 const BED_RECT := Rect2(-86, -64, 172, 118)
 const TAG_POS := Vector2(-16, -90)
+## 天蓋付きのときの札の位置（天蓋の上に出す）とタップ範囲
+const CANOPY_TAG_POS := Vector2(-16, -146)
+const CANOPY_BED_RECT := Rect2(-86, -128, 172, 182)
+## 天蓋の柱の高さ
+const CANOPY_UP := Vector2(0, -84)
 
+## いいキャンプチケットが有効なら天蓋付きで描く
+var canopy := false
 var _t := 0.0
 
 
@@ -22,14 +30,19 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 
+func tag_pos() -> Vector2:
+	return CANOPY_TAG_POS if canopy else TAG_POS
+
+
 func hit(p: Vector2) -> bool:
 	var local := p - global_position
-	return Rect2(TAG_POS - HALF - Vector2(12, 12), HALF * 2 + Vector2(24, 24)).has_point(local) or BED_RECT.has_point(local)
+	var rect := CANOPY_BED_RECT if canopy else BED_RECT
+	return Rect2(tag_pos() - HALF - Vector2(12, 12), HALF * 2 + Vector2(24, 24)).has_point(local) or rect.has_point(local)
 
 
 func _draw() -> void:
 	_draw_bed()
-	var c := TAG_POS + Vector2(0, sin(_t * 3.0) * 4.0)
+	var c := tag_pos() + Vector2(0, sin(_t * 3.0) * 4.0)
 	var box := ItemArt.rounded_rect(c, HALF, 10)
 	draw_colored_polygon(box, Color.WHITE)
 	ItemArt.outline(self, box, LINE, 3.0)
@@ -53,6 +66,10 @@ func _draw_bed() -> void:
 	# 足は影の位置（H * 2.6）まで届く。頭側の2本はヘッドボードの下から出る
 	for q in [d, a, c, b]:
 		draw_rect(Rect2(q + H + Vector2(-3, -2), Vector2(6, H.y * 1.6 + 2)), Color("b38a55"))
+	if canopy:
+		# 奥側の2本の柱はマットレスより先に描く
+		for q in [a, d]:
+			_post(q, H)
 	# ヘッドボード（上が丸い板）
 	var head := PackedVector2Array([c + H * 1.6, d + H * 1.6])
 	for i in 13:
@@ -98,3 +115,76 @@ func _draw_bed() -> void:
 	ItemArt.outline(self, PackedVector2Array([a, b, b + L * k, a + L * k]), Color("d97a9e"), 1.5)
 	ItemArt.outline(self, PackedVector2Array([b + L * k, c, d, a + L * k]), Color("d8ccb4"), 1.5)
 	ItemArt.outline(self, PackedVector2Array([b + L * k + H * 1.25, b + L * k, c, c + H]), Color("d8ccb4"), 1.5)
+	if canopy:
+		_draw_canopy(a, b, c, d, H)
+
+
+## 天蓋の柱（足の下端から天蓋まで）
+func _post(q: Vector2, h: Vector2) -> void:
+	var r := Rect2(q + CANOPY_UP + Vector2(-3, 0), Vector2(6, h.y * 2.6 - CANOPY_UP.y))
+	draw_rect(r, Color("e8b878"))
+	draw_rect(r, Color("a8794a"), false, 1.5)
+	draw_circle(q + CANOPY_UP + Vector2(0, -2), 4.5, Color("e8b878"))
+	draw_arc(q + CANOPY_UP + Vector2(0, -2), 4.5, 0, TAU, 16, Color("a8794a"), 1.5)
+
+
+## 手前の柱と、天蓋（屋根の布・ふち飾り・柱に結んだカーテン）
+func _draw_canopy(a: Vector2, b: Vector2, c: Vector2, d: Vector2, h: Vector2) -> void:
+	var u := CANOPY_UP
+	var cloth := Color("fffaf0")
+	var cloth_shade := Color("f3e3ea")
+	var trim := Color("f7a8c4")
+	var trim_line := Color("d97a9e")
+	# 奥のカーテン（奥の柱に結んで手前の布より先に描く）
+	_drape(a, (d - a), cloth_shade, trim_line)
+	_post(b, h)
+	_post(c, h)
+	# 屋根の布（上面）
+	var roof := PackedVector2Array([a + u, b + u, c + u, d + u])
+	draw_colored_polygon(roof, cloth)
+	ItemArt.outline(self, roof, Color("d8ccb4"), 1.5)
+	# 手前に垂れるふち飾り（足元側と手前の側面）。下側は波形
+	for e in [[a, b], [b, c]]:
+		var p0: Vector2 = e[0] + u
+		var p1: Vector2 = e[1] + u
+		var frill := PackedVector2Array([p0, p1])
+		var n := 4 if e[0] == a else 8
+		for i in range(n * 6, -1, -1):
+			var t := float(i) / (n * 6)
+			var wave := absf(sin(t * n * PI))
+			frill.append(p0.lerp(p1, t) + Vector2(0, 9 + 5 * wave))
+		draw_colored_polygon(frill, trim)
+		ItemArt.outline(self, frill, trim_line, 1.5)
+		var mid0: Vector2 = p0 + Vector2(0, 4)
+		var mid1: Vector2 = p1 + Vector2(0, 4)
+		draw_line(mid0, mid1, Color(1, 1, 1, 0.8), 1.5)
+	# 手前の柱に結んだカーテン
+	_drape(b, (a - b), cloth_shade, trim_line)
+	_drape(b, (c - b), cloth_shade, trim_line)
+	_drape(c, (b - c), cloth_shade, trim_line)
+
+
+## 柱 q から辺の向き toward に広がり、柱の中ほどでリボンで結んだカーテン
+func _drape(q: Vector2, toward: Vector2, color: Color, line: Color) -> void:
+	var u := CANOPY_UP
+	var top := q + u + Vector2(0, 12)
+	var tie := q + u * 0.5
+	var poly := PackedVector2Array([top])
+	# 上辺（ふち飾りの下）を少し広げ、結び目までしぼる
+	for i in 9:
+		var t := i / 8.0
+		var w := 0.26 * (1.0 - t) * (1.0 - t) + 0.03
+		poly.append(top.lerp(tie, t) + toward * w)
+	# 結び目から下はふわっと広がって床近くまで
+	var bottom := q + u * 0.06
+	for i in range(1, 9):
+		var t := i / 8.0
+		var w := 0.03 + 0.11 * sin(t * PI * 0.5)
+		poly.append(tie.lerp(bottom, t) + toward * w)
+	poly.append(bottom)
+	poly.append(tie)
+	draw_colored_polygon(poly, color)
+	ItemArt.outline(self, poly, Color("d8ccb4"), 1.2)
+	# 結んだリボン
+	draw_circle(tie + toward * 0.03, 3.5, Color("f7a8c4"))
+	draw_arc(tie + toward * 0.03, 3.5, 0, TAU, 12, line, 1.2)
