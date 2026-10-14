@@ -207,10 +207,6 @@ func _build() -> void:
 	for spec in EX_ROWS:
 		_number_row(ex_rows, spec)
 
-	_section(v, "その他")
-	_number_row(v, ["他のメンバーのおてつだいボーナス数", "other_help_bonus", "", 0, 4, 1, 1.0])
-	_check(v, "いいキャンプチケット（所持数・おてつだいスピード 1.2倍）", "camp_ticket")
-
 	var note := _label("変更は次の「すすめる」から反映されます。", 15)
 	note.add_theme_color_override("font_color", TEXT_SUB)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

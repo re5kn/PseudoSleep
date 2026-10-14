@@ -9,7 +9,6 @@ enum Nature { NONE, SPEED, INGREDIENT, SKILL, GENKI }
 ## サブスキル（id → 表示名）
 const SUBSKILLS := {
 	"berry_s": "きのみの数S",
-	"help_bonus": "おてつだいボーナス",
 	"speed_m": "おてつだいスピードM",
 	"speed_s": "おてつだいスピードS",
 	"ing_m": "食材確率アップM",
@@ -23,7 +22,7 @@ const SUBSKILLS := {
 
 ## サブスキルを選べる数が1つ増えるレベル（最大5つ）
 const SUBSKILL_SLOT_LEVELS: Array[int] = [10, 25, 50, 70, 80]
-## サブスキルによるおてつだい時間の短縮（おてつだいボーナスを含む）の上限
+## サブスキルとおてつだいボーナスによるおてつだい時間の短縮の上限
 const SPEED_REDUCTION_CAP := 0.35
 ## 食材枠2・3が解放されるレベル
 const SLOT_UNLOCK_LEVELS: Array[int] = [1, 30, 60]
@@ -55,8 +54,8 @@ var ribbon_sleep_hours := 0
 var subskills := {}
 var nature_up: int = Nature.NONE
 var nature_down: int = Nature.NONE
-## 他のメンバーが持つおてつだいボーナスの数（0〜4）
-var other_help_bonus := 0
+## チーム全体のおてつだいボーナスの数（0〜5）。画面下部で決め、パチモンと妖精の全員に同じ値が入る
+var help_bonus_count := 0
 ## イベント補正（ON のときだけ効く）
 var event_on := false
 ## イベント: 1回で拾うきのみの数の増加数
@@ -81,7 +80,7 @@ var ex_extra_ingredient := 0
 var ex_extra_ingredient_prob := 0.0
 ## EXモード: スキル発生確率の倍率
 var ex_skill_mult := 1.0
-## いいキャンプチケット（最大所持数 1.2倍・おてつだいスピード 1.2倍）
+## いいキャンプチケット（最大所持数 1.2倍・おてつだいスピード 1.2倍）。画面下部で決め、全員に同じ値が入る
 var camp_ticket := false
 ## false にすると、レベルに関係なくすべての食材枠を使う（テスト用）
 var unlock_slots_by_level := true
@@ -156,15 +155,14 @@ func _nature_factor(kind: int, up: float, down: float) -> float:
 	return f
 
 
-## サブスキルによるおてつだい時間の短縮率（上限35%）
+## サブスキルとおてつだいボーナスによるおてつだい時間の短縮率（上限35%）
 func speed_reduction() -> float:
 	var r := 0.0
 	if has_subskill("speed_m"):
 		r += 0.14
 	if has_subskill("speed_s"):
 		r += 0.07
-	var bonus := other_help_bonus + (1 if has_subskill("help_bonus") else 0)
-	r += 0.05 * bonus
+	r += 0.05 * help_bonus_count
 	return minf(r, SPEED_REDUCTION_CAP)
 
 
@@ -316,8 +314,9 @@ func is_berry(id: String) -> bool:
 	return id == berry["id"]
 
 
-## 設定の保存で書き出さない項目
-const NOT_SAVED := ["berry", "unlock_slots_by_level"]
+## 設定の保存で書き出さない項目。おてつだいボーナス数といいキャンプチケットはチーム全体の設定なので、
+## 変身しても変わらない
+const NOT_SAVED := ["berry", "unlock_slots_by_level", "help_bonus_count", "camp_ticket"]
 
 
 ## 保存用に、設定パネルで変えられる値をまとめて取り出す（JSON にできる形）
@@ -358,7 +357,13 @@ func apply_dict(d: Dictionary) -> void:
 					set(key, clip_name(v) if key == "pseudon_name" else v)
 			TYPE_DICTIONARY:
 				if v is Dictionary:
-					set(key, v.duplicate(true))
+					var dv: Dictionary = v.duplicate(true)
+					if key == "subskills":
+						# サブスキルから外した項目（おてつだいボーナスなど）は読み捨てる
+						for id in dv.keys():
+							if not SUBSKILLS.has(id):
+								dv.erase(id)
+					set(key, dv)
 			TYPE_ARRAY:
 				if v is Array and key == "ingredients":
 					for i in mini(v.size(), ingredients.size()):
