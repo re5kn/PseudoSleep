@@ -18,6 +18,15 @@ const ICON_RADIUS := HeadMark.ICON_RADIUS
 const RIGHT_HAND := Vector2(-60, 2)
 ## 食材は手のひらから食材Aの幅（19px）ぶん右に出す
 const LEFT_HAND := Vector2(77, 6)
+## 蝶ネクタイ（おやすみリボン）をつける首もと（口の下）と、羽の半分の幅・高さ
+const BOWTIE_POS := Vector2(-3, -38)
+const BOWTIE_HALF := Vector2(25, 13)
+## おやすみリボンの段階ごとの蝶ネクタイの色（[地の色, 縁の色]）。段階 4 は虹色に光るので使わない
+const BOWTIE_COLORS := {
+	1: [Color(0.97, 0.97, 0.95), Color(0.55, 0.55, 0.6)],
+	2: [Color(0.25, 0.5, 0.95), Color(0.08, 0.2, 0.5)],
+	3: [Color(0.98, 0.78, 0.2), Color(0.55, 0.38, 0.05)],
+}
 
 var show_icon := false
 ## 設定パネルを開ける印（「…」の吹き出し）を出すか
@@ -25,6 +34,8 @@ var show_menu := false
 var icon_full := false
 var exclaim_count := 0
 var exclaim_anim := 0.0
+## おやすみリボンの段階（Params.ribbon_tier）。1 以上なら首もとに蝶ネクタイをつける
+var ribbon_tier := 0
 var _t := 0.0
 
 
@@ -66,6 +77,8 @@ func _draw() -> void:
 	draw_colored_polygon(ItemArt.ellipse(Vector2(0, BODY_RY + 8), BODY_RX * 0.8 * shadow_s, 12 * shadow_s), Color(0, 0, 0, 0.22))
 	draw_set_transform(Vector2(0, -float_y), 0.0, Vector2.ONE)
 	_draw_body()
+	if ribbon_tier > 0:
+		_draw_bowtie()
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	if show_icon:
 		_draw_icon(-float_y)
@@ -78,6 +91,75 @@ func _draw() -> void:
 func _draw_body() -> void:
 	var size := Vector2(TEXTURE.get_width(), TEXTURE.get_height()) * (SPRITE_HEIGHT / TEXTURE.get_height())
 	draw_texture_rect(TEXTURE, Rect2(SPRITE_CENTER - size / 2, size), false)
+
+
+## 蝶ネクタイ。羽2枚と結び目を描き、段階 4 は色が流れるように変わって光る（スター状態ふう）
+func _draw_bowtie() -> void:
+	var c := BOWTIE_POS
+	var w := BOWTIE_HALF.x
+	var h := BOWTIE_HALF.y
+	var wings := []
+	for side in [-1.0, 1.0]:
+		wings.append(PackedVector2Array([
+			c + Vector2(side * 4, -4), c + Vector2(side * w, -h), c + Vector2(side * (w - 3), 0),
+			c + Vector2(side * w, h), c + Vector2(side * 4, 4),
+		]))
+	var knot := ItemArt.rounded_rect(c, Vector2(6, 7), 3)
+	if ribbon_tier >= 4:
+		_draw_rainbow_bowtie(wings, knot)
+		return
+	var fill: Color = BOWTIE_COLORS[ribbon_tier][0]
+	var line: Color = BOWTIE_COLORS[ribbon_tier][1]
+	for i in wings.size():
+		draw_colored_polygon(wings[i], fill)
+		# 羽のひだ（結び目から外へ広がる影）
+		var side := -1.0 if i == 0 else 1.0
+		draw_line(c + Vector2(side * 7, -2), c + Vector2(side * (w - 6), -h + 5), fill.darkened(0.25), 2.0)
+		draw_line(c + Vector2(side * 7, 2), c + Vector2(side * (w - 6), h - 5), fill.darkened(0.25), 2.0)
+		ItemArt.outline(self, wings[i], line, 2.0)
+	draw_colored_polygon(knot, fill.darkened(0.12))
+	ItemArt.outline(self, knot, line, 2.0)
+	if ribbon_tier == 3:
+		# 金色はときどききらっと光る
+		var a := clampf(sin(_t * 2.6) * 2.0 - 1.0, 0.0, 1.0)
+		_draw_sparkle(c + Vector2(-w + 8, -h + 5), 7.0 * a, Color(1, 1, 0.9, a))
+
+
+func _draw_rainbow_bowtie(wings: Array, knot: PackedVector2Array) -> void:
+	var c := BOWTIE_POS
+	var hue := fmod(_t * 1.6, 1.0)
+	# 後ろの光の輪（色が変わりながら脈打つ）
+	var pulse := 1.0 + sin(_t * 9.0) * 0.12
+	for k in 4:
+		var col := Color.from_hsv(fmod(hue + k * 0.08, 1.0), 0.8, 1.0, 0.16)
+		draw_colored_polygon(ItemArt.ellipse(c, (BOWTIE_HALF.x + 22 - k * 6) * pulse, (BOWTIE_HALF.y + 9 - k * 3) * pulse), col)
+	for i in wings.size():
+		var pts: PackedVector2Array = wings[i]
+		var cols := PackedColorArray()
+		for j in pts.size():
+			# 頂点ごとに色相をずらして、羽の上を虹色が流れるようにする
+			cols.append(Color.from_hsv(fmod(hue + i * 0.5 + j * 0.12, 1.0), 0.75, 1.0))
+		draw_polygon(pts, cols)
+		ItemArt.outline(self, pts, Color(1, 1, 1, 0.9), 2.0)
+	draw_colored_polygon(knot, Color.from_hsv(fmod(hue + 0.25, 1.0), 0.6, 1.0))
+	ItemArt.outline(self, knot, Color(1, 1, 1, 0.9), 2.0)
+	# まわりを回るきらきら
+	for k in 3:
+		var ang := _t * 2.2 + k * TAU / 3.0
+		var p := c + Vector2(cos(ang) * (BOWTIE_HALF.x + 14), sin(ang) * (BOWTIE_HALF.y + 10))
+		var a := 0.6 + 0.4 * sin(_t * 7.0 + k * 2.0)
+		_draw_sparkle(p, 6.0 * a, Color(1, 1, 1, a))
+
+
+## 4つの角があるきらめき
+func _draw_sparkle(p: Vector2, r: float, color: Color) -> void:
+	if r <= 0.5:
+		return
+	var t := r * 0.28
+	draw_colored_polygon(PackedVector2Array([
+		p + Vector2(0, -r), p + Vector2(t, -t), p + Vector2(r, 0), p + Vector2(t, t),
+		p + Vector2(0, r), p + Vector2(-t, t), p + Vector2(-r, 0), p + Vector2(-t, -t),
+	]), color)
 
 
 func _draw_icon(bob: float) -> void:
