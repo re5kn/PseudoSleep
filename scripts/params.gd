@@ -9,15 +9,15 @@ enum Nature { NONE, SPEED, INGREDIENT, SKILL, GENKI }
 ## サブスキル（id → 表示名）
 const SUBSKILLS := {
 	"berry_s": "きのみの数S",
+	"carry_l": "最大所持数アップL",
+	"carry_m": "最大所持数アップM",
+	"carry_s": "最大所持数アップS",
 	"speed_m": "おてつだいスピードM",
 	"speed_s": "おてつだいスピードS",
 	"ing_m": "食材確率アップM",
 	"ing_s": "食材確率アップS",
 	"skill_m": "スキル確率アップM",
 	"skill_s": "スキル確率アップS",
-	"carry_l": "最大所持数アップL",
-	"carry_m": "最大所持数アップM",
-	"carry_s": "最大所持数アップS",
 }
 
 ## サブスキルを選べる数が1つ増えるレベル（最大5つ）

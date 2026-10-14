@@ -387,7 +387,7 @@ func _test_subskill_slots() -> void:
 	p.subskills = {"berry_s": true, "speed_m": true, "ing_s": true, "carry_l": true, "carry_s": true}
 	p.level = 50
 	p.trim_subskills()
-	check(p.subskills.keys() == ["berry_s", "speed_m", "ing_s"], "Lv.50に下げると下の項目から外れる (got %s)" % str(p.subskills.keys()))
+	check(p.subskills.keys() == ["berry_s", "carry_l", "carry_s"], "Lv.50に下げると下の項目から外れる (got %s)" % str(p.subskills.keys()))
 	p.level = 80
 	p.trim_subskills()
 	check(p.subskills.size() == 3, "レベルを上げても自動では付かない")
