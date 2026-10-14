@@ -608,7 +608,7 @@ func _update_fairy_info_text() -> void:
 	if fairy_popup_index < 0:
 		return
 	var slot := presets.slot_name(fairies[fairy_popup_index].preset)
-	fairy_info_text.text = "「%s」のパラメータ変更は以下の手順で行います。\n1. 設定パネルで「%s」に変身\n2. 任意のパラメータを設定\n3. 「記憶」を選択" % [slot, slot]
+	fairy_info_text.text = "「%s」のパラメータ変更は以下の手順で行います。\n1. 設定パネルで「%s」に「変身」\n2. 任意のパラメータを設定\n3. 「記憶」を選択" % [slot, slot]
 	fairy_info.reset_size()
 
 
