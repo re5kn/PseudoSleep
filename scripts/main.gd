@@ -341,7 +341,7 @@ func _build_panel() -> void:
 	genki_button = _toggle()
 	genki_button.pressed.connect(_on_genki_toggled)
 	row2.add_child(genki_button)
-	# げんきの初期値。パチモンと妖精の両方に入る。矢印は10ずつ、入力は1単位
+	# げんきの初期値。パチモンと妖精の両方に入る
 	genki_start_row = HBoxContainer.new()
 	genki_start_row.add_theme_constant_override("separation", 6)
 	row2.add_child(genki_start_row)
@@ -351,7 +351,6 @@ func _build_panel() -> void:
 	genki_start_spin.min_value = 0
 	genki_start_spin.max_value = Sim.GENKI_MAX
 	genki_start_spin.step = 1
-	genki_start_spin.custom_arrow_step = 10
 	genki_start_spin.value = sim.genki_start
 	genki_start_spin.custom_minimum_size = Vector2(110, 0)
 	genki_start_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
