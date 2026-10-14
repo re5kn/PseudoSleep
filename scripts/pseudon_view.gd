@@ -98,7 +98,7 @@ func _draw_body() -> void:
 	draw_texture_rect(TEXTURE, Rect2(SPRITE_CENTER - size / 2, size), false)
 
 
-## 蝶ネクタイ（BOWTIE_POS を原点にした座標）。羽2枚と結び目を描き、段階 4 は色が流れるように変わって光る（スター状態ふう）
+## 蝶ネクタイ（BOWTIE_POS を原点にした座標）。羽2枚と結び目を描き、段階 4 は虹色が流れるように変わる
 func _draw_bowtie() -> void:
 	var c := Vector2.ZERO
 	var w := BOWTIE_HALF.x
@@ -131,13 +131,7 @@ func _draw_bowtie() -> void:
 
 
 func _draw_rainbow_bowtie(wings: Array, knot: PackedVector2Array) -> void:
-	var c := Vector2.ZERO
 	var hue := fmod(_t * RAINBOW_SPEED, 1.0)
-	# 後ろの光の輪（色が変わりながら脈打つ）
-	var pulse := 1.0 + sin(_t * 9.0) * 0.12
-	for k in 4:
-		var col := Color.from_hsv(fmod(hue + k * 0.08, 1.0), RAINBOW_SAT, 1.0, 0.16)
-		draw_colored_polygon(ItemArt.ellipse(c, (BOWTIE_HALF.x + 22 - k * 6) * pulse, (BOWTIE_HALF.y + 9 - k * 3) * pulse), col)
 	for i in wings.size():
 		var pts: PackedVector2Array = wings[i]
 		var cols := PackedColorArray()
@@ -148,12 +142,6 @@ func _draw_rainbow_bowtie(wings: Array, knot: PackedVector2Array) -> void:
 		ItemArt.outline(self, pts, Color(1, 1, 1, 0.9), 2.0)
 	draw_colored_polygon(knot, Color.from_hsv(fmod(hue + 0.25, 1.0), RAINBOW_SAT * 0.8, 1.0))
 	ItemArt.outline(self, knot, Color(1, 1, 1, 0.9), 2.0)
-	# まわりを回るきらきら
-	for k in 3:
-		var ang := _t * 2.2 + k * TAU / 3.0
-		var p := c + Vector2(cos(ang) * (BOWTIE_HALF.x + 14), sin(ang) * (BOWTIE_HALF.y + 10))
-		var a := 0.6 + 0.4 * sin(_t * 7.0 + k * 2.0)
-		_draw_sparkle(p, 6.0 * a, Color(1, 1, 1, a))
 
 
 ## 4つの角があるきらめき
