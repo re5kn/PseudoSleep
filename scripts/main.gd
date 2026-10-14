@@ -814,6 +814,7 @@ func _build_settings() -> void:
 	settings.setup(sim.params, ui_theme)
 	settings.visible = false
 	settings.changed.connect(_on_params_changed)
+	settings.stored.connect(_on_preset_stored)
 	settings.close_requested.connect(_set_settings_open.bind(false))
 	layer.add_child(settings)
 
@@ -841,6 +842,16 @@ func _set_settings_slide(t: float) -> void:
 
 func _on_params_changed() -> void:
 	sim.clamp_stock()
+	_refresh()
+
+
+## 設定パネルで枠 k に記憶したら、その枠に変身している妖精にもすぐ入れ直す
+func _on_preset_stored(k: int) -> void:
+	for f in fairies:
+		if f.preset == k and presets.restore(k, f.sim.params):
+			f.sim.clamp_stock()
+	if fairy_popup_index >= 0:
+		_update_fairy_summary()
 	_refresh()
 
 
