@@ -31,6 +31,8 @@ var genki_mode: int = GenkiMode.ALWAYS_HIGH
 ## DECAY モードで減り始めた時刻と、そのときのげんき（メインスキルで増減すると、減る間隔はそのままこの値を足し引きする）
 var genki_origin_sec := 0.0
 var genki_base := GENKI_START
+## DECAY モードで減り始めるときのげんき（画面下部で設定する初期値）
+var genki_start := GENKI_START
 
 var elapsed_sec := 0.0
 ## 進行中のおてつだいが終わる時刻
@@ -65,7 +67,7 @@ func _init(p: Params = null) -> void:
 func reset() -> void:
 	elapsed_sec = 0.0
 	genki_origin_sec = 0.0
-	genki_base = GENKI_START
+	genki_base = genki_start
 	pending.clear()
 	on_field.clear()
 	berry_box.clear()
@@ -96,7 +98,14 @@ func new_stats() -> Dictionary:
 func set_genki_mode(mode: int) -> void:
 	genki_mode = mode
 	genki_origin_sec = elapsed_sec
-	genki_base = GENKI_START
+	genki_base = genki_start
+
+
+## げんきの初期値を start にし、今のげんきもその値から減り始め直す（0〜GENKI_MAX）
+func set_genki_start(start: int) -> void:
+	genki_start = clampi(start, 0, GENKI_MAX)
+	genki_origin_sec = elapsed_sec
+	genki_base = genki_start
 
 
 func genki_at(t: float) -> int:
