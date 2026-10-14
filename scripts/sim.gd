@@ -131,7 +131,7 @@ func sleep_recovery(minutes: int) -> int:
 
 ## minutes 分眠る。そのあいだもおてつだいとげんきの減少は通常どおり進み、起きた時点でげんきが回復する。
 ## 回復しても100を超えない（もともと100以上なら変わらない）。
-## help が false なら時間だけ進めて回復しない（休んでいる妖精用）。進めた間の結果を返す
+## help が false なら時間だけ進め、げんきは減りも回復もしない（休んでいる妖精用）。進めた間の結果を返す
 func sleep(minutes: int, help := true) -> Dictionary:
 	var sec := minutes * 60.0
 	if not help:
@@ -176,9 +176,10 @@ func advance(seconds: float) -> Dictionary:
 	return r
 
 
-## おてつだいをせずに時間だけ進める（おてつだいを休んでいる妖精用）
+## おてつだいをせずに時間だけ進める（おてつだいを休んでいる妖精用）。休んでいるあいだはげんきも減らない
 func idle(seconds: float) -> void:
 	elapsed_sec += seconds
+	genki_origin_sec += seconds
 
 
 ## 今からおてつだいを始め直す。持っている分とスキルのストック・不発カウントは捨てる（げんきはそのまま）
