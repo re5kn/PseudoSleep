@@ -3,7 +3,7 @@ extends Node2D
 ## アイコンが出ていないとき（タップで設定パネルを開けるとき）は「…」の吹き出しを出す。
 
 const ItemArt = preload("res://scripts/item_art.gd")
-const FONT = preload("res://fonts/MPLUSRounded1c-Bold.ttf")
+const HeadMark = preload("res://scripts/head_mark.gd")
 const TEXTURE = preload("res://images/pseudon.png")
 
 const BODY_RX := 62.0
@@ -13,7 +13,7 @@ const SPRITE_HEIGHT := 190.0
 const SPRITE_CENTER := Vector2(0, -8)
 ## 頭上の印（アイコン・「…」・「!」）は画像の上端（-103）よりしっぽ込みで上に出す
 const ICON_POS := Vector2(0, -152)
-const ICON_RADIUS := 27.0
+const ICON_RADIUS := HeadMark.ICON_RADIUS
 ## 手のひらのあたり（画面から見て左がパチモンの右手）。きのみは右手、食材は左手から出す
 const RIGHT_HAND := Vector2(-60, 2)
 ## 食材は手のひらから食材Aの幅（19px）ぶん右に出す
@@ -81,40 +81,12 @@ func _draw_body() -> void:
 
 
 func _draw_icon(bob: float) -> void:
-	var c := ICON_POS + Vector2(0, bob)
-	var border := Color("e2483d") if icon_full else Color("f0a43a")
-	draw_colored_polygon(PackedVector2Array([
-		c + Vector2(-9, ICON_RADIUS - 4), c + Vector2(9, ICON_RADIUS - 4), c + Vector2(0, ICON_RADIUS + 12),
-	]), border)
-	draw_circle(c, ICON_RADIUS + 3, border)
-	draw_circle(c, ICON_RADIUS - 1, Color.WHITE)
-	ItemArt.draw_item(self, "berry", c + Vector2(0, 2), 1.15)
-	if icon_full:
-		var pos := c + Vector2(-40, -ICON_RADIUS - 8)
-		draw_string_outline(FONT, pos, "MAX", HORIZONTAL_ALIGNMENT_CENTER, 80, 18, 6, Color.WHITE)
-		draw_string(FONT, pos, "MAX", HORIZONTAL_ALIGNMENT_CENTER, 80, 18, border)
+	HeadMark.draw_icon(self, ICON_POS + Vector2(0, bob), icon_full)
 
 
 func _draw_menu(bob: float) -> void:
-	var c := ICON_POS + Vector2(0, bob)
-	var oval := ItemArt.rounded_rect(c, Vector2(ICON_RADIUS + 4, ICON_RADIUS - 6), 10)
-	draw_colored_polygon(oval, Color.WHITE)
-	ItemArt.outline(self, oval, Color("0d2738"), 3.0)
-	for i in 3:
-		draw_circle(c + Vector2((i - 1) * 11, 0), 3.6, Color.BLACK)
+	HeadMark.draw_menu(self, ICON_POS + Vector2(0, bob))
 
 
 func _draw_exclaims() -> void:
-	# ストック2回分なら1つの吹き出しに「!!」を並べる
-	var text := "!".repeat(exclaim_count)
-	var stretch := 1.0 + 0.3 * (exclaim_count - 1)
-	draw_set_transform(Vector2(0, ICON_POS.y), 0.0, Vector2.ONE * exclaim_anim)
-	var burst := ItemArt.burst(Vector2.ZERO, 27.0, stretch)
-	draw_colored_polygon(burst, Color("ffd93b"))
-	ItemArt.outline(self, burst, Color("e2483d"), 3.0)
-	var w := 60.0 * exclaim_count
-	var pos := Vector2(-w / 2, 13)
-	draw_set_transform(Vector2(0, ICON_POS.y), ItemArt.EXCLAIM_TILT, Vector2.ONE * exclaim_anim)
-	draw_string_outline(FONT, pos, text, HORIZONTAL_ALIGNMENT_CENTER, w, 38, 6, Color.WHITE)
-	draw_string(FONT, pos, text, HORIZONTAL_ALIGNMENT_CENTER, w, 38, Color("e2483d"))
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	HeadMark.draw_exclaims(self, Vector2(0, ICON_POS.y), exclaim_count, exclaim_anim)
