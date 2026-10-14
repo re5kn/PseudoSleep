@@ -21,6 +21,9 @@ const GENKI_START := 100
 const GENKI_DECAY_SEC := 600.0
 ## メインスキルで回復できるげんきの上限
 const GENKI_MAX := 150
+## 睡眠で回復するげんきの上限と、それだけ回復する睡眠時間（8時間30分）
+const SLEEP_GENKI_MAX := 100
+const SLEEP_FULL_MIN := 510
 
 var params: Params
 var rng := RandomNumberGenerator.new()
@@ -117,6 +120,29 @@ func add_genki(amount: int) -> void:
 		amount = int(floor(amount * params.genki_recovery_factor() + 1e-6))
 	var g := clampi(genki_at(elapsed_sec) + amount, 0, GENKI_MAX)
 	genki_base = g + _genki_decayed(elapsed_sec)
+
+
+## 睡眠 minutes 分で回復するげんき。8時間30分で100、せいかく（げんき回復）の倍率を掛けて四捨五入し、100まで
+func sleep_recovery(minutes: int) -> int:
+	var x := float(minutes) / SLEEP_FULL_MIN * SLEEP_GENKI_MAX * params.genki_recovery_factor()
+	return mini(SLEEP_GENKI_MAX, int(round(x)))
+
+
+## minutes 分眠る。そのあいだもおてつだいとげんきの減少は通常どおり進み、起きた時点でげんきが回復する。
+## 回復しても100を超えない（もともと100以上なら変わらない）。
+## help が false なら時間だけ進めて回復しない（休んでいる妖精用）。進めた間の結果を返す
+func sleep(minutes: int, help := true) -> Dictionary:
+	var sec := minutes * 60.0
+	if not help:
+		idle(sec)
+		return new_stats()
+	var r := advance(sec)
+	if genki_mode == GenkiMode.DECAY:
+		var g := genki_at(elapsed_sec)
+		if g < SLEEP_GENKI_MAX:
+			var after := mini(SLEEP_GENKI_MAX, g + sleep_recovery(minutes))
+			genki_base = after + _genki_decayed(elapsed_sec)
+	return r
 
 
 static func genki_multiplier(genki: int) -> float:

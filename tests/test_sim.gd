@@ -30,6 +30,7 @@ func _init() -> void:
 	_test_add_genki()
 	_test_genki_nature()
 	_test_fairy_sim()
+	_test_sleep()
 	_test_name_width()
 	_test_example1_help_count()
 	_test_example2_help_count()
@@ -547,6 +548,44 @@ func _test_fairy_sim() -> void:
 	check(is_equal_approx(s.next_help_at, s.elapsed_sec + t), "始め直すと今からおてつだい1回分あと")
 	var r := s.advance(t + 1)
 	check(r["helps"] == 1, "始め直したあとはおてつだいする")
+
+
+## 睡眠: 8時間30分で100回復（せいかく補正込みで四捨五入、100まで）。眠っているあいだもおてつだいとげんきの減少は進む
+func _test_sleep() -> void:
+	print("睡眠")
+	var s := Sim.new()
+	check(s.sleep_recovery(510) == 100, "8時間30分で100")
+	check(s.sleep_recovery(30) == 6, "30分は5.88で6")
+	check(s.sleep_recovery(240) == 47, "4時間は47.06で47")
+	check(s.sleep_recovery(600) == 100, "8時間30分より長くても100")
+	s.params.nature_up = Params.Nature.GENKI
+	check(s.sleep_recovery(240) == 56, "上昇: 47.06×1.2=56.47で56 (got %d)" % s.sleep_recovery(240))
+	check(s.sleep_recovery(450) == 100, "上昇でも100まで")
+	s.params.nature_up = Params.Nature.NONE
+	s.params.nature_down = Params.Nature.GENKI
+	check(s.sleep_recovery(510) == 88, "下降: 100×0.88=88 (got %d)" % s.sleep_recovery(510))
+	s.params.nature_down = Params.Nature.NONE
+
+	s.set_genki_mode(Sim.GenkiMode.DECAY)
+	var r := s.sleep(240)
+	check(r["helps"] > 0 and s.totals["helps"] == r["helps"], "眠っているあいだもおてつだいする")
+	check(is_equal_approx(s.elapsed_sec, 240 * 60.0), "睡眠時間だけ進む")
+	check(s.genki_at(s.elapsed_sec) == 100, "100-24+47 は100で止まる (got %d)" % s.genki_at(s.elapsed_sec))
+	s.add_genki(-80)
+	s.sleep(120)
+	# 20から12減って8、2時間=23.5で24回復 → 32
+	check(s.genki_at(s.elapsed_sec) == 32, "減ってから起きた時点で回復 (got %d)" % s.genki_at(s.elapsed_sec))
+	check(s.genki_at(s.elapsed_sec + 600.0) == 31, "起きたあとも10分ごとに減る")
+	s.add_genki(100)
+	s.sleep(30)
+	check(s.genki_at(s.elapsed_sec) == 129, "100以上なら睡眠では回復しない (got %d)" % s.genki_at(s.elapsed_sec))
+	var idle := Sim.new()
+	idle.set_genki_mode(Sim.GenkiMode.DECAY)
+	idle.sleep(510, false)
+	check(idle.totals["helps"] == 0 and idle.genki_at(idle.elapsed_sec) == 49, "休んでいるなら時間だけ進む")
+	var high := Sim.new()
+	high.sleep(510)
+	check(high.genki_at(high.elapsed_sec) == 100, "81以上で固定のときは変わらない")
 
 
 func _test_name_width() -> void:
