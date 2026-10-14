@@ -16,7 +16,7 @@ const FieldClock = preload("res://scripts/field_clock.gd")
 const Fairy = preload("res://scripts/fairy.gd")
 const FairyView = preload("res://scripts/fairy_view.gd")
 const Presets = preload("res://scripts/presets.gd")
-const BedTag = preload("res://scripts/bed_tag.gd")
+const Bed = preload("res://scripts/bed.gd")
 const FONT = preload("res://fonts/MPLUSRounded1c-Bold.ttf")
 
 const VIEW_SIZE := Vector2(720, 1280)
@@ -26,8 +26,8 @@ const PILE_Y := 636.0
 const PILE_GAP := 88.0
 const BOX_POS := Vector2(138, 764)
 const DESK_POS := Vector2(606, 560)
-## ベッド（背景に描いてある）の上の「ねむる」の札（タップ範囲はベッドも含む）
-const BED_TAG_POS := Vector2(462, 262)
+## ベッド（「ねむる」の札付き）の中心
+const BED_POS := Vector2(478, 352)
 const SLEEP_POPUP_W := 380.0
 ## 睡眠時間（分）の刻みと範囲
 const SLEEP_STEP_MIN := 30
@@ -91,7 +91,7 @@ var actor_root: Node2D
 var pseudon: PseudonView
 var storage_box: StorageBox
 var desk: Desk
-var bed_tag: BedTag
+var bed: Bed
 var clock: FieldClock
 var phase_tint: ColorRect
 var phase := FieldClock.phase_at(FieldClock.START_SEC)
@@ -239,9 +239,9 @@ func _build_field() -> void:
 	desk.position = DESK_POS
 	field.add_child(desk)
 
-	bed_tag = BedTag.new()
-	bed_tag.position = BED_TAG_POS
-	field.add_child(bed_tag)
+	bed = Bed.new()
+	bed.position = BED_POS
+	field.add_child(bed)
 
 	clock = FieldClock.new()
 	clock.position = CLOCK_POS
@@ -619,8 +619,8 @@ func _show_sleep_popup() -> void:
 	_update_sleep_popup()
 	sleep_popup.reset_size()
 	# 札の下に出す
-	var x := clampf(BED_TAG_POS.x - SLEEP_POPUP_W / 2, 12, VIEW_SIZE.x - SLEEP_POPUP_W - 12)
-	sleep_popup.position = Vector2(x, BED_TAG_POS.y + 60)
+	var x := clampf(BED_POS.x + Bed.TAG_POS.x - SLEEP_POPUP_W / 2, 12, VIEW_SIZE.x - SLEEP_POPUP_W - 12)
+	sleep_popup.position = Vector2(x, BED_POS.y + Bed.TAG_POS.y + 60)
 	sleep_popup.visible = true
 
 
@@ -960,7 +960,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			elif had_fairy_popup != i:
 				_show_fairy_popup(i)
 			return
-	if bed_tag.hit(p):
+	if bed.hit(p):
 		if not had_sleep_popup:
 			_show_sleep_popup()
 		return
