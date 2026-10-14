@@ -301,7 +301,7 @@ func _test_presets() -> void:
 	# ファイルには記憶した枠だけが入り、ほかの枠は初期設定のまま
 	var saved: Array = JSON.parse_string(FileAccess.get_file_as_string(path))
 	check(saved.size() == 6, "ファイルは6枠 (got %d)" % saved.size())
-	check(saved[1] == null and saved[2] is Dictionary, "初期設定の枠はファイルに書かない")
+	check(saved[0] == null and saved[1] == null and saved[2] is Dictionary, "初期設定の枠はファイルに書かない")
 	check(pr2.slot_name(4) == "No.25実Sいじ", "記憶していない枠は初期設定")
 	# 常に上書き
 	p.pseudon_name = "うわがき"
@@ -321,9 +321,13 @@ func _test_preset_defaults() -> void:
 	var names := []
 	for i in Presets.SLOT_COUNT:
 		names.append(pr.slot_name(i))
-	check(names == ["設定1", "回復役", "本島EXバフ", "砂浜EXデバフ", "No.25実Sいじ", "設定6"], "設定名 (got %s)" % str(names))
-	check(not pr.is_saved(0) and pr.is_saved(1) and pr.is_saved(4) and not pr.is_saved(5), "設定2〜5は変身でき、設定1・6は空")
+	check(names == ["ベアビヲ9", "回復役", "本島EXバフ", "砂浜EXデバフ", "No.25実Sいじ", "設定6"], "設定名 (got %s)" % str(names))
+	check(pr.is_saved(0) and pr.is_saved(4) and not pr.is_saved(5), "設定1〜5は変身でき、設定6は空")
 	var p := Params.new()
+	p.level = 10
+	p.skill_prob = 0.5
+	pr.restore(0, p)
+	check(p.pseudon_name == "ベアビヲ9" and p.to_dict() == Params.new().to_dict(), "設定1: 名前とパラメータの初期値（ベアビヲ9）に戻る")
 	pr.restore(4, p)
 	check(p.pseudon_name == "No.25実Sいじ" and p.level == 25 and p.base_help_sec == 2700.0, "設定5: 名前・LV25・2700秒")
 	check(_near(p.ingredient_prob, 0.207, 1e-9) and _near(p.skill_prob, 0.021, 1e-9), "設定5: 食材20.7%%・スキル2.1%%")

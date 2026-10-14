@@ -10,7 +10,10 @@ const SLOT_COUNT := 6
 ## 枠ごとの初期設定。{"name": 設定名, "params": Params の初期値から変える項目}。null の枠は空。
 ## ingredients は食材枠ごとの数の配列で書く。
 const DEFAULTS := [
-	null,
+	{
+		"name": "ベアビヲ9",
+		"params": {},
+	},
 	{
 		"name": "回復役",
 		"params": {
