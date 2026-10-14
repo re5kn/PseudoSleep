@@ -132,15 +132,14 @@ func _test_modifiers() -> void:
 	p.subskills = {"speed_m": true}
 	# 基礎資料の計算例: 2400×0.882×0.86 = 1820.448
 	check(p.help_sec() == 1820.0, "おてつだいスピードMで1820秒 (got %f)" % p.help_sec())
-	p.subskills = {"speed_m": true, "speed_s": true, "help_bonus": true}
-	p.other_help_bonus = 4
+	p.subskills = {"speed_m": true, "speed_s": true}
+	p.help_bonus_count = 5
 	# 0.14+0.07+0.05×5 = 0.46 → 上限0.35
 	check(_near(p.speed_reduction(), 0.35, 1e-9), "短縮は35%%で頭打ち (got %f)" % p.speed_reduction())
-	p.subskills = {"help_bonus": true}
-	p.other_help_bonus = 2
-	check(_near(p.speed_reduction(), 0.15, 1e-9), "おてつだいボーナス自分1＋他2で15%%")
 	p.subskills = {}
-	p.other_help_bonus = 0
+	p.help_bonus_count = 3
+	check(_near(p.speed_reduction(), 0.15, 1e-9), "おてつだいボーナス3つで15%%")
+	p.help_bonus_count = 0
 	p.nature_up = Params.Nature.SPEED
 	check(p.help_sec() == floorf(2400.0 * 0.882 * 0.9), "せいかくでおてつだいスピード上昇は時間0.9倍")
 	p.nature_up = Params.Nature.NONE
@@ -295,7 +294,9 @@ func _test_presets() -> void:
 	check(_near(q.skill_prob, 0.051, 1e-9) and q.nature_up == Params.Nature.SKILL, "スキル確率とせいかく")
 	check(q.has_subskill("speed_m") and q.has_subskill("carry_s") and q.subskills.size() == 2, "サブスキル")
 	check(q.ingredients[2]["amount"] == 7 and q.ingredients[2]["id"] == "ing_c", "食材枠の数（id はそのまま）")
-	check(q.event_on and _near(q.event_carry_mult, 1.5, 1e-9) and q.camp_ticket, "イベント・チケット")
+	check(q.event_on and _near(q.event_carry_mult, 1.5, 1e-9), "イベント")
+	check(not q.camp_ticket, "いいキャンプチケットはチーム全体の設定なので変身で変わらない")
+	q.camp_ticket = true
 	check(q.help_sec() == p.help_sec() and q.carry_limit() == p.carry_limit(), "計算に使う値も同じ")
 	check(not pr2.restore(5, q) and q.pseudon_name == "ためし", "空の枠では変身しない")
 	# ファイルには記憶した枠だけが入り、ほかの枠は初期設定のまま
@@ -309,7 +310,14 @@ func _test_presets() -> void:
 	pr2.store(2, p)
 	var pr3 := Presets.new(path)
 	check(pr3.slot_name(2) == "うわがき" and int(pr3.slots[2]["params"]["level"]) == 10, "同じ枠は上書き")
+	check(not pr3.slots[2]["params"].has("help_bonus_count") and not pr3.slots[2]["params"].has("camp_ticket"),
+		"おてつだいボーナス数とチケットは記憶しない")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	# 以前の保存データ（サブスキルのおてつだいボーナス・他のメンバーの数・チケット）は読み捨てる
+	var old := Params.new()
+	old.help_bonus_count = 2
+	old.apply_dict({"subskills": {"help_bonus": true, "speed_s": true}, "other_help_bonus": 4, "camp_ticket": true})
+	check(old.subskills.keys() == ["speed_s"] and old.help_bonus_count == 2 and not old.camp_ticket, "以前の保存データ")
 
 
 func _test_preset_defaults() -> void:
@@ -379,7 +387,7 @@ func _test_subskill_slots() -> void:
 	p.subskills = {"berry_s": true, "speed_m": true, "ing_s": true, "carry_l": true, "carry_s": true}
 	p.level = 50
 	p.trim_subskills()
-	check(p.subskills.keys() == ["berry_s", "speed_m", "ing_s"], "Lv.50に下げると下の項目から外れる (got %s)" % str(p.subskills.keys()))
+	check(p.subskills.keys() == ["berry_s", "carry_l", "carry_s"], "Lv.50に下げると下の項目から外れる (got %s)" % str(p.subskills.keys()))
 	p.level = 80
 	p.trim_subskills()
 	check(p.subskills.size() == 3, "レベルを上げても自動では付かない")

@@ -21,6 +21,8 @@ const FONT = preload("res://fonts/MPLUSRounded1c-Bold.ttf")
 
 const VIEW_SIZE := Vector2(720, 1280)
 const FIELD_HEIGHT := 1040.0
+## 画面下部の操作パネルの上端。チーム全体の設定の行を足した分だけフィールドに重ねて上へ広げる
+const PANEL_TOP := 972.0
 const PSEUDON_POS := Vector2(360, 505)
 const PILE_Y := 636.0
 const PILE_GAP := 88.0
@@ -112,6 +114,9 @@ var genki_button: Button
 ## げんきの初期値（「げんき：nから減少」のとき横に出す）
 var genki_start_row: HBoxContainer
 var genki_start_spin: SpinBox
+## チーム全体のおてつだいボーナスの数といいキャンプチケット（パチモンと妖精の全員に入る）
+var help_bonus_spin: SpinBox
+var camp_check: CheckBox
 var status_label: RichTextLabel
 var toast_box: VBoxContainer
 var box_popup: PanelContainer
@@ -299,8 +304,8 @@ func _build_panel() -> void:
 	var layer := _layer(1)
 	var panel := PanelContainer.new()
 	panel.theme = ui_theme
-	panel.position = Vector2(0, FIELD_HEIGHT)
-	panel.size = Vector2(VIEW_SIZE.x, VIEW_SIZE.y - FIELD_HEIGHT)
+	panel.position = Vector2(0, PANEL_TOP)
+	panel.size = Vector2(VIEW_SIZE.x, VIEW_SIZE.y - PANEL_TOP)
 	var sb := _style(CREAM, 0, 14)
 	sb.corner_radius_top_left = 28
 	sb.corner_radius_top_right = 28
@@ -312,6 +317,34 @@ func _build_panel() -> void:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	panel.add_child(v)
+
+	# チーム全体の設定: おてつだいボーナスの数（0〜5）といいキャンプチケット
+	var team := HBoxContainer.new()
+	team.theme = SettingsPanel.make_theme(ui_theme)
+	team.add_theme_constant_override("separation", 6)
+	v.add_child(team)
+	team.add_child(_label("おてつだいボーナス", 18))
+	help_bonus_spin = SpinBox.new()
+	help_bonus_spin.min_value = 0
+	help_bonus_spin.max_value = 5
+	help_bonus_spin.step = 1
+	help_bonus_spin.value = sim.params.help_bonus_count
+	help_bonus_spin.suffix = "個"
+	help_bonus_spin.custom_minimum_size = Vector2(110, 0)
+	help_bonus_spin.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	help_bonus_spin.select_all_on_focus = true
+	help_bonus_spin.value_changed.connect(func(x: float) -> void: _set_team("help_bonus_count", int(x)))
+	team.add_child(help_bonus_spin)
+	var gap := Control.new()
+	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	team.add_child(gap)
+	camp_check = CheckBox.new()
+	camp_check.text = "いいキャンプチケット"
+	camp_check.button_pressed = sim.params.camp_ticket
+	camp_check.focus_mode = Control.FOCUS_NONE
+	camp_check.add_theme_font_size_override("font_size", 18)
+	camp_check.toggled.connect(func(on: bool) -> void: _set_team("camp_ticket", on))
+	team.add_child(camp_check)
 
 	var row1 := HBoxContainer.new()
 	row1.add_theme_constant_override("separation", 8)
@@ -811,6 +844,21 @@ func _on_params_changed() -> void:
 	_refresh()
 
 
+## チーム全体の設定（おてつだいボーナスの数・いいキャンプチケット）をパチモンと妖精の全員に入れる。
+## 次の「すすめる」から反映される
+func _set_team(key: String, value: Variant) -> void:
+	var all: Array[Sim] = [sim]
+	for f in fairies:
+		all.append(f.sim)
+	for s in all:
+		s.params.set(key, value)
+		s.clamp_stock()
+	settings.refresh_summary()
+	if fairy_popup_index >= 0:
+		_update_fairy_summary()
+	_refresh()
+
+
 func _style(color: Color, radius: int, pad: float) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = color
@@ -954,7 +1002,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
 		return
 	var p := _field_pos(event)
-	if p.y > FIELD_HEIGHT or cutin_active:
+	if p.y > PANEL_TOP or cutin_active:
 		return
 	get_viewport().set_input_as_handled()
 	# 設定パネルの入力欄を編集中なら確定させる
@@ -1015,7 +1063,7 @@ func _on_swipe(p: Vector2) -> void:
 	var steps := maxi(1, ceili(swipe_last.distance_to(p) / (ItemPile.HIT_RADIUS * 0.5)))
 	for i in range(1, steps + 1):
 		var q := swipe_last.lerp(p, float(i) / steps)
-		if q.y > FIELD_HEIGHT:
+		if q.y > PANEL_TOP:
 			continue
 		for id in piles:
 			if not swiped.has(id) and piles[id].hit(q):
