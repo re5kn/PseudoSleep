@@ -6,6 +6,8 @@ const Params = preload("res://scripts/params.gd")
 const Presets = preload("res://scripts/presets.gd")
 
 signal changed
+## 枠 i に記憶した
+signal stored(i: int)
 signal close_requested
 
 const TEXT_DARK := Color("5a4632")
@@ -268,6 +270,7 @@ func _on_store() -> void:
 	presets.store(i, params)
 	preset_select.set_item_text(i, presets.slot_name(i))
 	_update_preset_buttons()
+	stored.emit(i)
 
 
 ## 名前は全角6文字・半角12文字まで（全角2・半角1で数えて12まで）。超えた分は後ろから削る。

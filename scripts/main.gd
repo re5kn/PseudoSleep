@@ -40,6 +40,7 @@ const FAIRY_REST_OFFSETS := [Vector2(-128, 52), Vector2(128, 52)]
 const FAIRY_FLY_OFFSETS := [Vector2(-128, -42), Vector2(128, -42)]
 const FAIRY_COLORS := [Color("ff9ccf"), Color("8fd3ff")]
 const FAIRY_POPUP_W := 400.0
+const FAIRY_INFO_W := 300.0
 ## 妖精の初期の変身先（へんしんリストの「回復役」の枠）
 const FAIRY_PRESET := 1
 const MIN_HOURS := 1
@@ -133,6 +134,9 @@ var fairy_amount: SpinBox
 var fairy_target_checks: Array[CheckBox] = []
 var fairy_preset: OptionButton
 var fairy_summary: Label
+## 変身の (i) で出す説明の吹き出し
+var fairy_info: PanelContainer
+var fairy_info_text: Label
 var bubble_label: Label
 ## 睡眠の設定欄（睡眠時間と「ねむる」ボタン）
 var sleep_popup: PanelContainer
@@ -499,6 +503,7 @@ func _build_fairy_popup(layer: CanvasLayer) -> void:
 	preset_row.add_theme_constant_override("separation", 8)
 	v.add_child(preset_row)
 	preset_row.add_child(_label("変身", 18))
+	preset_row.add_child(_info_button())
 	fairy_preset = OptionButton.new()
 	fairy_preset.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	fairy_preset.focus_mode = Control.FOCUS_NONE
@@ -548,6 +553,64 @@ func _build_fairy_popup(layer: CanvasLayer) -> void:
 	fairy_summary.custom_minimum_size = Vector2(FAIRY_POPUP_W - 40, 0)
 	v.add_child(fairy_summary)
 
+	fairy_info = PanelContainer.new()
+	fairy_info.visible = false
+	fairy_info.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var isb := _style(Color.WHITE, 12, 8)
+	isb.set_border_width_all(2)
+	isb.border_color = Color("e6cf9f")
+	isb.shadow_color = Color(0, 0, 0, 0.2)
+	isb.shadow_size = 4
+	fairy_info.add_theme_stylebox_override("panel", isb)
+	fairy_info_text = _label("", 15)
+	fairy_info_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	fairy_info_text.custom_minimum_size = Vector2(FAIRY_INFO_W, 0)
+	fairy_info.add_child(fairy_info_text)
+	layer.add_child(fairy_info)
+
+
+## 「変身」の横の (i)。タップかマウスを乗せると説明の吹き出しを出す
+func _info_button() -> Button:
+	var b := Button.new()
+	b.text = "i"
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(28, 28)
+	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	b.add_theme_font_size_override("font_size", 17)
+	var color := Color("8a7660")
+	for state in ["normal", "hover", "pressed"]:
+		var sb := _style(color.lightened(0.15) if state == "hover" else color, 14, 0)
+		sb.content_margin_left = 0
+		sb.content_margin_right = 0
+		b.add_theme_stylebox_override(state, sb)
+	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	for key in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color"]:
+		b.add_theme_color_override(key, Color.WHITE)
+	# タッチでもマウスでも、押したときと乗せたときに出し、外れたら消す（タッチは他の場所を触ると外れる）
+	b.pressed.connect(_show_fairy_info.bind(b))
+	b.mouse_entered.connect(_show_fairy_info.bind(b))
+	b.mouse_exited.connect(func() -> void: fairy_info.visible = false)
+	return b
+
+
+## (i) の下に吹き出しを出す。設定欄からはみ出しても画面の中に収める
+func _show_fairy_info(b: Button) -> void:
+	_update_fairy_info_text()
+	fairy_info.reset_size()
+	var at := b.global_position + Vector2(b.size.x / 2 - fairy_info.size.x / 2, b.size.y + 6)
+	at.x = clampf(at.x, 12, VIEW_SIZE.x - fairy_info.size.x - 12)
+	fairy_info.position = at
+	fairy_info.visible = true
+
+
+## 吹き出しの説明。名前は今変身している枠の設定名
+func _update_fairy_info_text() -> void:
+	if fairy_popup_index < 0:
+		return
+	var slot := presets.slot_name(fairies[fairy_popup_index].preset)
+	fairy_info_text.text = "「%s」のパラメータ変更は以下の手順で行います。\n1. 設定パネルで「%s」に「変身」\n2. 任意のパラメータを設定\n3. 「記憶」を選択" % [slot, slot]
+	fairy_info.reset_size()
+
 
 func _show_fairy_popup(i: int) -> void:
 	fairy_popup_index = i
@@ -580,6 +643,7 @@ func _hide_fairy_popup() -> void:
 	get_viewport().gui_release_focus()
 	fairy_popup_index = -1
 	fairy_popup.visible = false
+	fairy_info.visible = false
 	_refresh()
 
 
@@ -598,6 +662,7 @@ func _on_fairy_preset_selected(k: int) -> void:
 	f.preset = k
 	f.sim.clamp_stock()
 	_update_fairy_summary()
+	_update_fairy_info_text()
 	_refresh()
 
 
@@ -814,6 +879,7 @@ func _build_settings() -> void:
 	settings.setup(sim.params, ui_theme)
 	settings.visible = false
 	settings.changed.connect(_on_params_changed)
+	settings.stored.connect(_on_preset_stored)
 	settings.close_requested.connect(_set_settings_open.bind(false))
 	layer.add_child(settings)
 
@@ -841,6 +907,16 @@ func _set_settings_slide(t: float) -> void:
 
 func _on_params_changed() -> void:
 	sim.clamp_stock()
+	_refresh()
+
+
+## 設定パネルで枠 k に記憶したら、その枠に変身している妖精にもすぐ入れ直す
+func _on_preset_stored(k: int) -> void:
+	for f in fairies:
+		if f.preset == k and presets.restore(k, f.sim.params):
+			f.sim.clamp_stock()
+	if fairy_popup_index >= 0:
+		_update_fairy_summary()
 	_refresh()
 
 
