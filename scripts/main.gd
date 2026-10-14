@@ -423,6 +423,20 @@ func _build_fairy_popup(layer: CanvasLayer) -> void:
 	fairy_heal_check.toggled.connect(_on_fairy_heals_toggled)
 	v.add_child(fairy_heal_check)
 
+	var preset_row := HBoxContainer.new()
+	preset_row.add_theme_constant_override("separation", 8)
+	v.add_child(preset_row)
+	preset_row.add_child(_label("変身", 18))
+	fairy_preset = OptionButton.new()
+	fairy_preset.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	fairy_preset.focus_mode = Control.FOCUS_NONE
+	fairy_preset.fit_to_longest_item = false
+	fairy_preset.clip_text = true
+	fairy_preset.add_theme_font_size_override("font_size", 18)
+	fairy_preset.get_popup().add_theme_font_size_override("font_size", 20)
+	fairy_preset.item_selected.connect(_on_fairy_preset_selected)
+	preset_row.add_child(fairy_preset)
+
 	var amount_row := HBoxContainer.new()
 	amount_row.add_theme_constant_override("separation", 6)
 	v.add_child(amount_row)
@@ -455,20 +469,6 @@ func _build_fairy_popup(layer: CanvasLayer) -> void:
 				fairies[fairy_popup_index].targets[k] = on)
 		target_row.add_child(cb)
 		fairy_target_checks.append(cb)
-
-	var preset_row := HBoxContainer.new()
-	preset_row.add_theme_constant_override("separation", 8)
-	v.add_child(preset_row)
-	preset_row.add_child(_label("変身", 18))
-	fairy_preset = OptionButton.new()
-	fairy_preset.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	fairy_preset.focus_mode = Control.FOCUS_NONE
-	fairy_preset.fit_to_longest_item = false
-	fairy_preset.clip_text = true
-	fairy_preset.add_theme_font_size_override("font_size", 18)
-	fairy_preset.get_popup().add_theme_font_size_override("font_size", 20)
-	fairy_preset.item_selected.connect(_on_fairy_preset_selected)
-	preset_row.add_child(fairy_preset)
 
 	fairy_summary = _label("", 15)
 	fairy_summary.add_theme_color_override("font_color", Color("8a7660"))
