@@ -42,6 +42,7 @@ func _init() -> void:
 	_test_skill_stock()
 	_test_collect_limits()
 	_test_time_phase()
+	_test_expected_values()
 	if failures == 0:
 		print("ALL TESTS PASSED")
 	else:
@@ -820,3 +821,38 @@ func _test_time_phase() -> void:
 	check(FieldClock.day_and_clock(23 * 3600.0 + 59 * 60 + 59) == [1, "3:59"], "elapsed 23:59:59 -> day 1 3:59")
 	check(FieldClock.day_and_clock(24 * 3600.0) == [2, "4:00"], "elapsed 24h -> day 2 4:00")
 	check(FieldClock.day_and_clock(51 * 3600.0 + 30 * 60) == [3, "7:30"], "elapsed 51.5h -> day 3 7:30")
+
+
+## 期待値（#71）。「すすめる」1回ごとに、おてつだい回数から二項分布で求めて足していく
+func _test_expected_values() -> void:
+	print("期待値の表示（二項分布）")
+	var pp := 0.039 / (1.0 - pow(0.961, 66))
+	check(absf(Sim.capped_binomial_mean(30, pp, 2) - 1.086) < 0.001, "B(30, p')を上限2で打ち切ると1.086回 (got %.4f)" % Sim.capped_binomial_mean(30, pp, 2))
+	check(absf(Sim.capped_binomial_mean(30, 0.039, 2) - 1.025) < 0.001, "B(30, 3.9%)を上限2で打ち切ると1.025回")
+	check(absf(Sim.capped_binomial_mean(30, 0.039, 1) - (1.0 - pow(0.961, 30))) < 1e-9, "上限1なら1−P(0)")
+	check(absf(Sim.capped_binomial_mean(5, 0.3, 99) - 1.5) < 1e-9, "上限が十分大きければ n×p")
+	check(Sim.capped_binomial_mean(10, 0.5, 0) == 0.0 and Sim.capped_binomial_mean(0, 0.5, 2) == 0.0, "空きがない、またはおてつだい0回なら0")
+
+	var p := Params.new()
+	p.max_carry = 1000000
+	p.max_skill_stock = 2
+	var s := Sim.new(p)
+	var r := s.advance(p.help_sec() * 0.45 * 30 + 1)
+	var k: int = r["helps"]
+	var q := p.ingredient_chance()
+	check(k == 30, "30回おてつだい (got %d)" % k)
+	check(absf(r["exp_ingredient_helps"] - k * q) < 1e-9 and absf(r["exp_berry_helps"] - k * (1.0 - q)) < 1e-9, "食材は k×食材確率、きのみは k×(1−食材確率)")
+	check(absf(r["exp_skills"] - Sim.capped_binomial_mean(k, p.skill_chance(), 2)) < 1e-9, "スキルはストックの空き2で打ち切る")
+	var stock := s.skill_stock
+	r = s.advance(p.help_sec() * 0.45 * 10)
+	check(absf(r["exp_skills"] - Sim.capped_binomial_mean(r["helps"], p.skill_chance(), 2 - stock)) < 1e-9, "タップせずに進めると、残っているストックの分だけ空きが減る (stock %d)" % stock)
+	check(absf(s.totals["exp_skills"] - (Sim.capped_binomial_mean(k, p.skill_chance(), 2) + r["exp_skills"])) < 1e-9, "累計は「すすめる」ごとの期待値の合計")
+
+	# いつのまに育成のおてつだいは数えない
+	var p2 := Params.new()
+	p2.max_carry = 3
+	p2.berries_per_help = 1
+	p2.ingredient_prob = 0.0
+	var s2 := Sim.new(p2)
+	r = s2.advance(p2.help_sec() * 0.45 * 10 + 1)
+	check(r["full_helps"] == 7 and absf(r["exp_berry_helps"] - 3.0) < 1e-9, "いつのまに育成の7回は除いて、きのみ3回 (full %d, exp %.2f)" % [r["full_helps"], r["exp_berry_helps"]])

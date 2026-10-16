@@ -92,6 +92,10 @@ func new_stats() -> Dictionary:
 		"auto_fed": 0,
 		"carry_lost": 0,
 		"items": {},
+		# 期待値（「すすめる」1回ごとに、そのあいだのおてつだい回数から二項分布で求めて足していく）
+		"exp_berry_helps": 0.0,
+		"exp_ingredient_helps": 0.0,
+		"exp_skills": 0.0,
 	}
 
 
@@ -176,13 +180,44 @@ func advance(seconds: float) -> Dictionary:
 	var r := new_stats()
 	r["seconds"] = seconds
 	var end := elapsed_sec + seconds
+	var stock_before := skill_stock
 	while next_help_at <= end + 1e-6:
 		var t := next_help_at
 		_do_help(r, t)
 		next_help_at = t + help_interval_at(t)
 	elapsed_sec = end
+	_add_expected(r, stock_before)
 	_accumulate(r)
 	return r
+
+
+## 進めたあいだの期待値を r に入れる。いつのまに育成になったおてつだいは食材もスキルも出ないので数えない。
+## 残りの k 回を独立な試行とみなし、食材は k×食材確率、きのみは k×(1−食材確率)。
+## スキルは B(k, スキル確率) の回数を、進め始めたときのストックの空き c で打ち切った期待値
+## Σ min(j, c)×P(j)（天井は考えない）。
+func _add_expected(r: Dictionary, stock_before: int) -> void:
+	var k: int = r["helps"] - r["full_helps"]
+	var q := params.ingredient_chance() if not params.active_ingredients().is_empty() else 0.0
+	r["exp_ingredient_helps"] = k * q
+	r["exp_berry_helps"] = k * (1.0 - q)
+	r["exp_skills"] = capped_binomial_mean(k, params.skill_chance(), params.max_skill_stock - stock_before)
+
+
+## X ~ B(n, p) のとき min(X, cap) の期待値
+static func capped_binomial_mean(n: int, p: float, cap: int) -> float:
+	if n <= 0 or cap <= 0 or p <= 0.0:
+		return 0.0
+	if p >= 1.0:
+		return float(mini(n, cap))
+	# cap 回未満で終わる分だけ足し、残りの確率はすべて cap 回とする
+	var mean := 0.0
+	var below := 0.0
+	var pj := pow(1.0 - p, n)
+	for j in mini(n + 1, cap):
+		mean += j * pj
+		below += pj
+		pj *= float(n - j) / float(j + 1) * p / (1.0 - p)
+	return mean + cap * maxf(0.0, 1.0 - below)
 
 
 ## おてつだいをせずに時間だけ進める（おてつだいを休んでいる妖精用）。休んでいるあいだはげんきも減らない

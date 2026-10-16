@@ -1355,6 +1355,11 @@ func _hide_box_popup() -> void:
 	box_popup_timer = null
 
 
+## 期待値のかっこ書き（小数第1位まで）
+func _expected_text(v: float) -> String:
+	return "（%.1f）" % v
+
+
 func _format_hours(sec: float) -> String:
 	var total_min := int(round(sec / 60.0))
 	return "%d時間%02d分" % [total_min / 60, total_min % 60]
@@ -1374,20 +1379,22 @@ func _refresh() -> void:
 				genki += "・%s %d" % [f.label, f.sim.genki_at(f.sim.elapsed_sec)]
 	# おてつだいの累計（リセットで 0 に戻る）
 	var t := sim.totals
-	var ceiling_hits := "（天井%d）" % t["skill_ceiling_hits"]
+	var ceiling_count := "%d回" % t["skill_ceiling_hits"]
 	if t["skill_ceiling_hits"] > 0:
-		ceiling_hits = "[color=%s]%s[/color]" % [CEILING_COLOR.to_html(false), ceiling_hits]
-	# 「○回」の縦位置をそろえるため、項目名・回数・天井の3列の表にする
+		ceiling_count = "[color=%s]%s[/color]" % [CEILING_COLOR.to_html(false), ceiling_count]
+	# 「○回」の縦位置をそろえるため、項目名・回数・期待値の3列の表にする。
+	# 期待値は「すすめる」ごとに二項分布で求めた値の合計（Sim._add_expected）
 	var rows := [
-		["おてつだい回数", t["helps"], ""],
-		["きのみ回数", t["berry_helps"], ""],
-		["食材回数", t["ingredient_helps"], ""],
-		["スキル回数", t["skills"], ceiling_hits],
-		["いつのまに育成回数", t["full_helps"], ""],
+		["おてつだい回数", "%d回" % t["helps"], ""],
+		["きのみ回数", "%d回" % t["berry_helps"], _expected_text(t["exp_berry_helps"])],
+		["食材回数", "%d回" % t["ingredient_helps"], _expected_text(t["exp_ingredient_helps"])],
+		["スキル回数", "%d回" % t["skills"], _expected_text(t["exp_skills"])],
+		["　うち天井", ceiling_count, ""],
+		["いつのまに育成回数", "%d回" % t["full_helps"], ""],
 	]
 	var table := "[table=3]"
 	for row in rows:
-		table += "[cell padding=0,0,16,0]%s[/cell][cell][right]%d回[/right][/cell][cell]%s[/cell]" % row
+		table += "[cell padding=0,0,16,0]%s[/cell][cell][right]%s[/right][/cell][cell]%s[/cell]" % row
 	table += "[/table]"
 	hud_label.text = "%s（Lv.%d）\n経過 %s ・ げんき %s\n%s" % [
 		sim.params.pseudon_name, sim.params.level, _format_hours(sim.elapsed_sec), genki, table]
