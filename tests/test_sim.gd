@@ -823,15 +823,18 @@ func _test_time_phase() -> void:
 	check(FieldClock.day_and_clock(51 * 3600.0 + 30 * 60) == [3, "7:30"], "elapsed 51.5h -> day 3 7:30")
 
 
-## 期待値（#71）。「すすめる」1回ごとに、おてつだい回数から二項分布で求めて足していく
+## 期待値（#71）。「すすめる」1回ごとに、おてつだい回数から求めて足していく。スキルは天井込み
 func _test_expected_values() -> void:
-	print("期待値の表示（二項分布）")
-	var pp := 0.039 / (1.0 - pow(0.961, 66))
-	check(absf(Sim.capped_binomial_mean(30, pp, 2) - 1.086) < 0.001, "B(30, p')を上限2で打ち切ると1.086回 (got %.4f)" % Sim.capped_binomial_mean(30, pp, 2))
-	check(absf(Sim.capped_binomial_mean(30, 0.039, 2) - 1.025) < 0.001, "B(30, 3.9%)を上限2で打ち切ると1.025回")
-	check(absf(Sim.capped_binomial_mean(30, 0.039, 1) - (1.0 - pow(0.961, 30))) < 1e-9, "上限1なら1−P(0)")
-	check(absf(Sim.capped_binomial_mean(5, 0.3, 99) - 1.5) < 1e-9, "上限が十分大きければ n×p")
-	check(Sim.capped_binomial_mean(10, 0.5, 0) == 0.0 and Sim.capped_binomial_mean(0, 0.5, 2) == 0.0, "空きがない、またはおてつだい0回なら0")
+	print("期待値の表示（食材は二項分布、スキルは天井込み）")
+	var none := 1000000
+	check(absf(Sim.skill_mean(30, 0.039, none, 2, 0, 0) - 1.025) < 0.001, "天井に届かなければ B(30, 3.9%%)を上限2で打ち切った1.025回 (got %.4f)" % Sim.skill_mean(30, 0.039, none, 2, 0, 0))
+	check(absf(Sim.skill_mean(30, 0.039, none, 1, 0, 0) - (1.0 - pow(0.961, 30))) < 1e-9, "上限1なら1−P(0)")
+	check(absf(Sim.skill_mean(5, 0.3, none, 99, 0, 0) - 1.5) < 1e-9, "上限が十分大きく天井もなければ k×p")
+	check(absf(Sim.skill_mean(30, 0.039, 65, 2, 35, 0) - 1.025) < 0.001, "不発35から30回では天井65に届かないので1.025回")
+	check(absf(Sim.skill_mean(30, 0.039, 65, 2, 36, 0) - 1.328) < 0.001, "不発36からなら30回目までに天井に届いて1.328回 (got %.4f)" % Sim.skill_mean(30, 0.039, 65, 2, 36, 0))
+	check(absf(Sim.skill_mean(99, 0.039, 65, 2, 0, 0) - 1.9544) < 0.0001, "不発0から99回で1.9544回")
+	check(absf(Sim.skill_mean(6, 0.0, 5, 2, 0, 0) - 1.0) < 1e-9, "確率0でも天井5なら6回目で必ず1回")
+	check(Sim.skill_mean(10, 0.5, 65, 2, 0, 2) == 0.0 and Sim.skill_mean(0, 0.5, 65, 2, 0, 0) == 0.0, "空きがない、またはおてつだい0回なら0")
 
 	var p := Params.new()
 	p.max_carry = 1000000
@@ -842,11 +845,24 @@ func _test_expected_values() -> void:
 	var q := p.ingredient_chance()
 	check(k == 30, "30回おてつだい (got %d)" % k)
 	check(absf(r["exp_ingredient_helps"] - k * q) < 1e-9 and absf(r["exp_berry_helps"] - k * (1.0 - q)) < 1e-9, "食材は k×食材確率、きのみは k×(1−食材確率)")
-	check(absf(r["exp_skills"] - Sim.capped_binomial_mean(k, p.skill_chance(), 2)) < 1e-9, "スキルはストックの空き2で打ち切る")
+	var e1 := Sim.skill_mean(k, p.skill_chance(), p.skill_ceiling, 2, 0, 0)
+	check(absf(r["exp_skills"] - e1) < 1e-9, "スキルは不発0・ストック0から天井込みで求める")
+	var miss := s.skill_miss
 	var stock := s.skill_stock
 	r = s.advance(p.help_sec() * 0.45 * 10)
-	check(absf(r["exp_skills"] - Sim.capped_binomial_mean(r["helps"], p.skill_chance(), 2 - stock)) < 1e-9, "タップせずに進めると、残っているストックの分だけ空きが減る (stock %d)" % stock)
-	check(absf(s.totals["exp_skills"] - (Sim.capped_binomial_mean(k, p.skill_chance(), 2) + r["exp_skills"])) < 1e-9, "累計は「すすめる」ごとの期待値の合計")
+	check(absf(r["exp_skills"] - Sim.skill_mean(r["helps"], p.skill_chance(), p.skill_ceiling, 2, miss, stock)) < 1e-9, "タップせずに進めると、そのときの不発カウントとストックから求める (miss %d, stock %d)" % [miss, stock])
+	check(absf(s.totals["exp_skills"] - (e1 + r["exp_skills"])) < 1e-9, "累計は「すすめる」ごとの期待値の合計")
+
+	# 天井込みの期待値は、実際の回数の平均と合う（タップしながら24時間ずつ200日）
+	var p3 := Params.new()
+	p3.max_carry = 100000000
+	var s3 := Sim.new(p3)
+	s3.rng.seed = 7
+	for d in 200:
+		s3.advance(24 * 3600.0)
+		s3.drop()
+	var t3 := s3.totals
+	check(absf(t3["skills"] - t3["exp_skills"]) < 4.0 * sqrt(t3["exp_skills"] * 0.05), "24時間ずつ200日でスキル%d回、期待値%.1f回" % [t3["skills"], t3["exp_skills"]])
 
 	# いつのまに育成のおてつだいは数えない
 	var p2 := Params.new()

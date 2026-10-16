@@ -180,44 +180,54 @@ func advance(seconds: float) -> Dictionary:
 	var r := new_stats()
 	r["seconds"] = seconds
 	var end := elapsed_sec + seconds
+	var miss_before := skill_miss
 	var stock_before := skill_stock
 	while next_help_at <= end + 1e-6:
 		var t := next_help_at
 		_do_help(r, t)
 		next_help_at = t + help_interval_at(t)
 	elapsed_sec = end
-	_add_expected(r, stock_before)
+	_add_expected(r, miss_before, stock_before)
 	_accumulate(r)
 	return r
 
 
-## 進めたあいだの期待値を r に入れる。いつのまに育成になったおてつだいは食材もスキルも出ないので数えない。
-## 残りの k 回を独立な試行とみなし、食材は k×食材確率、きのみは k×(1−食材確率)。
-## スキルは B(k, スキル確率) の回数を、進め始めたときのストックの空き c で打ち切った期待値
-## Σ min(j, c)×P(j)（天井は考えない）。
-func _add_expected(r: Dictionary, stock_before: int) -> void:
+## 進めたあいだの期待値を r に入れる。いつのまに育成になったおてつだいは食材もスキルも抽選しないので数えない。
+## 残りの k 回を独立な試行とみなし、食材は k×食材確率、きのみは k×(1−食材確率)（二項分布の期待値）。
+## スキルは天井とストック上限があるので skill_mean で求める。
+func _add_expected(r: Dictionary, miss_before: int, stock_before: int) -> void:
 	var k: int = r["helps"] - r["full_helps"]
 	var q := params.ingredient_chance() if not params.active_ingredients().is_empty() else 0.0
 	r["exp_ingredient_helps"] = k * q
+	r["exp_skills"] = skill_mean(k, params.skill_chance(), params.skill_ceiling,
+		params.max_skill_stock, miss_before, stock_before)
 	r["exp_berry_helps"] = k * (1.0 - q)
-	r["exp_skills"] = capped_binomial_mean(k, params.skill_chance(), params.max_skill_stock - stock_before)
 
 
-## X ~ B(n, p) のとき min(X, cap) の期待値
-static func capped_binomial_mean(n: int, p: float, cap: int) -> float:
-	if n <= 0 or cap <= 0 or p <= 0.0:
-		return 0.0
-	if p >= 1.0:
-		return float(mini(n, cap))
-	# cap 回未満で終わる分だけ足し、残りの確率はすべて cap 回とする
+## 不発カウント miss・ストック stock の状態から k 回抽選したときの、スキル発動回数の期待値（天井込み）。
+## (不発カウント, ストック) の各状態にいる確率を、抽選1回ごとに追いかける。
+## ストックが上限の状態では抽選しない。不発カウントが ceiling 以上なら必ず発動し、発動したら0に戻る。
+static func skill_mean(k: int, p: float, ceiling: int, max_stock: int, miss: int, stock: int) -> float:
+	var states := {Vector2i(miss, stock): 1.0}
+	for i in k:
+		var next := {}
+		for st: Vector2i in states:
+			var pr: float = states[st]
+			if st.y >= max_stock:
+				next[st] = next.get(st, 0.0) + pr
+				continue
+			var hit := 1.0 if st.x >= ceiling else clampf(p, 0.0, 1.0)
+			if hit > 0.0:
+				var fired := Vector2i(0, st.y + 1)
+				next[fired] = next.get(fired, 0.0) + pr * hit
+			if hit < 1.0:
+				var missed := Vector2i(st.x + 1, st.y)
+				next[missed] = next.get(missed, 0.0) + pr * (1.0 - hit)
+		states = next
 	var mean := 0.0
-	var below := 0.0
-	var pj := pow(1.0 - p, n)
-	for j in mini(n + 1, cap):
-		mean += j * pj
-		below += pj
-		pj *= float(n - j) / float(j + 1) * p / (1.0 - p)
-	return mean + cap * maxf(0.0, 1.0 - below)
+	for st: Vector2i in states:
+		mean += (st.y - stock) * states[st]
+	return maxf(0.0, mean)
 
 
 ## おてつだいをせずに時間だけ進める（おてつだいを休んでいる妖精用）。休んでいるあいだはげんきも減らない
