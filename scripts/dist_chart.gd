@@ -79,7 +79,7 @@ func _draw() -> void:
 
 	# 期待値の位置（棒の中心が回数にあたる）
 	var mx := plot.position.x + ((mean - first) / width + 0.5) * bar_w
-	draw_dashed_line(Vector2(mx, plot.position.y), Vector2(mx, plot.end.y), MEAN_COLOR, 2.0, 6.0)
+	draw_dashed_line(Vector2(mx, plot.position.y), Vector2(mx, plot.end.y), MEAN_COLOR, 4.0, 6.0)
 
 	# 横軸（回数）の目盛り。棒が多いときは間引く
 	var step := maxi(1, ceili(bars / 8.0))
