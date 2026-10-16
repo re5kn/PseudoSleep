@@ -1385,7 +1385,7 @@ func _refresh() -> void:
 	# 「○回」の縦位置をそろえるため、項目名・回数・期待値の3列の表にする。
 	# 期待値は「すすめる」ごとに二項分布で求めた値の合計（Sim._add_expected）
 	var rows := [
-		["おてつだい回数", "%d回" % t["helps"], ""],
+		["おてつだい回数", "%d回" % t["helps"], "（）内は期待値"],
 		["きのみ回数", "%d回" % t["berry_helps"], _expected_text(t["exp_berry_helps"])],
 		["食材回数", "%d回" % t["ingredient_helps"], _expected_text(t["exp_ingredient_helps"])],
 		["スキル回数", "%d回" % t["skills"], _expected_text(t["exp_skills"])],
