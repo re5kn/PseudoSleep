@@ -12,6 +12,7 @@ extends RefCounted
 ## - 途中まで進んだおてつだいは次の「すすめる」に持ち越す
 
 const Params = preload("res://scripts/params.gd")
+const Dist = preload("res://scripts/dist.gd")
 
 enum GenkiMode { ALWAYS_HIGH, DECAY }
 
@@ -54,6 +55,9 @@ var totals := {}
 ## パチモンをタップした時点の行も時刻順に混ざる。タップの行は
 ## {"t": タップした時刻(秒), "tap": true, "amount": フィールドへ出した数, "stock": 使ったスキルのストック, "ceiling": うち天井の分}
 var help_log: Array[Dictionary] = []
+## リセットからの食材回数・スキル回数の確率分布（期待値と同じく「すすめる」ごとに、その時点の状態から求めてたたみ込む）
+var ingredient_dist := Dist.new()
+var skill_dist := Dist.new()
 
 enum Skill { NONE, HIT, CEILING }
 
@@ -77,6 +81,8 @@ func reset() -> void:
 	ceiling_stock = 0
 	totals = new_stats()
 	help_log.clear()
+	ingredient_dist.reset()
+	skill_dist.reset()
 	next_help_at = help_interval_at(0.0)
 
 
@@ -192,22 +198,40 @@ func advance(seconds: float) -> Dictionary:
 	return r
 
 
-## 進めたあいだの期待値を r に入れる。いつのまに育成になったおてつだいは食材もスキルも抽選しないので数えない。
+## 進めたあいだの期待値を r に入れ、累計の確率分布も更新する。
+## いつのまに育成になったおてつだいは食材もスキルも抽選しないので数えない。
 ## 残りの k 回を独立な試行とみなし、食材は k×食材確率、きのみは k×(1−食材確率)（二項分布の期待値）。
-## スキルは天井とストック上限があるので skill_mean で求める。
+## スキルは天井とストック上限があるので skill_pmf で求める。
 func _add_expected(r: Dictionary, miss_before: int, stock_before: int) -> void:
 	var k: int = r["helps"] - r["full_helps"]
 	var q := params.ingredient_chance() if not params.active_ingredients().is_empty() else 0.0
 	r["exp_ingredient_helps"] = k * q
-	r["exp_skills"] = skill_mean(k, params.skill_chance(), params.skill_ceiling,
-		params.max_skill_stock, miss_before, stock_before)
 	r["exp_berry_helps"] = k * (1.0 - q)
+	ingredient_dist.add(Dist.binomial(k, q))
+	var sp := skill_pmf(k, params.skill_chance(), params.skill_ceiling,
+		params.max_skill_stock, miss_before, stock_before)
+	r["exp_skills"] = pmf_mean(sp)
+	skill_dist.add(sp)
 
 
 ## 不発カウント miss・ストック stock の状態から k 回抽選したときの、スキル発動回数の期待値（天井込み）。
+static func skill_mean(k: int, p: float, ceiling: int, max_stock: int, miss: int, stock: int) -> float:
+	return pmf_mean(skill_pmf(k, p, ceiling, max_stock, miss, stock))
+
+
+static func pmf_mean(pmf: PackedFloat64Array) -> float:
+	var m := 0.0
+	for i in pmf.size():
+		m += i * pmf[i]
+	return m
+
+
+## 不発カウント miss・ストック stock の状態から k 回抽選したときの、スキル発動回数の確率分布（天井込み）。
+## 要素 i が「i 回発動する確率」。
 ## (不発カウント, ストック) の各状態にいる確率を、抽選1回ごとに追いかける。
 ## ストックが上限の状態では抽選しない。不発カウントが ceiling 以上なら必ず発動し、発動したら0に戻る。
-static func skill_mean(k: int, p: float, ceiling: int, max_stock: int, miss: int, stock: int) -> float:
+## 途中でタップしないので、発動回数は最後のストック − 最初のストック。
+static func skill_pmf(k: int, p: float, ceiling: int, max_stock: int, miss: int, stock: int) -> PackedFloat64Array:
 	var states := {Vector2i(miss, stock): 1.0}
 	for i in k:
 		var next := {}
@@ -224,10 +248,11 @@ static func skill_mean(k: int, p: float, ceiling: int, max_stock: int, miss: int
 				var missed := Vector2i(st.x + 1, st.y)
 				next[missed] = next.get(missed, 0.0) + pr * (1.0 - hit)
 		states = next
-	var mean := 0.0
+	var pmf := PackedFloat64Array()
+	pmf.resize(maxi(0, max_stock - stock) + 1)
 	for st: Vector2i in states:
-		mean += (st.y - stock) * states[st]
-	return maxf(0.0, mean)
+		pmf[maxi(0, st.y - stock)] += states[st]
+	return pmf
 
 
 ## おてつだいをせずに時間だけ進める（おてつだいを休んでいる妖精用）。休んでいるあいだはげんきも減らない

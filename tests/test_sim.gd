@@ -8,6 +8,8 @@ const Sim = preload("res://scripts/sim.gd")
 const Params = preload("res://scripts/params.gd")
 const FieldClock = preload("res://scripts/field_clock.gd")
 const Presets = preload("res://scripts/presets.gd")
+const Dist = preload("res://scripts/dist.gd")
+const Main = preload("res://scripts/main.gd")
 
 var failures := 0
 
@@ -43,6 +45,7 @@ func _init() -> void:
 	_test_collect_limits()
 	_test_time_phase()
 	_test_expected_values()
+	_test_distributions()
 	if failures == 0:
 		print("ALL TESTS PASSED")
 	else:
@@ -872,3 +875,50 @@ func _test_expected_values() -> void:
 	var s2 := Sim.new(p2)
 	r = s2.advance(p2.help_sec() * 0.45 * 10 + 1)
 	check(r["full_helps"] == 7 and absf(r["exp_berry_helps"] - 3.0) < 1e-9, "いつのまに育成の7回は除いて、きのみ3回 (full %d, exp %.2f)" % [r["full_helps"], r["exp_berry_helps"]])
+
+
+func _pmf_sum(pmf: PackedFloat64Array) -> float:
+	var t := 0.0
+	for v in pmf:
+		t += v
+	return t
+
+
+func _test_distributions() -> void:
+	print("回数の確率分布（(i) のグラフ）")
+	var b := Dist.binomial(4, 0.5)
+	check(b.size() == 5 and absf(b[0] - 0.0625) < 1e-12 and absf(b[2] - 0.375) < 1e-12, "B(4, 0.5) = 1/16, 4/16, 6/16, 4/16, 1/16")
+	var big := Dist.binomial(5000, 0.2)
+	check(absf(_pmf_sum(big) - 1.0) < 1e-9 and absf(Sim.pmf_mean(big) - 1000.0) < 1e-6, "k=5000 でもあふれず合計1、平均 k×q")
+	check(Dist.binomial(3, 0.0)[0] == 1.0 and Dist.binomial(3, 1.0)[3] == 1.0, "確率0・1の端")
+
+	var sp := Sim.skill_pmf(30, 0.039, 1000000, 2, 0, 0)
+	check(sp.size() == 3 and absf(sp[0] - pow(0.961, 30)) < 1e-9 and absf(_pmf_sum(sp) - 1.0) < 1e-9, "スキル30回・上限2：0回の確率は 0.961^30")
+	sp = Sim.skill_pmf(30, 0.039, 65, 2, 36, 0)
+	check(sp[0] == 0.0, "不発36から30回なら天井で0回はない")
+	check(Sim.skill_pmf(5, 0.5, 65, 2, 0, 2).size() == 1, "ストックが上限なら0回だけ")
+
+	var d := Dist.new()
+	d.add(Dist.binomial(2, 0.5))
+	d.add(Dist.binomial(2, 0.5))
+	check(absf(d.mass(2) - 0.375) < 1e-12 and absf(d.mean() - 2.0) < 1e-12, "たたみ込み：B(2,½)+B(2,½) = B(4,½)")
+	check(absf(d.at_most(1) - 0.3125) < 1e-12 and absf(d.at_least(3) - 0.3125) < 1e-12, "1回以下・3回以上は 5/16")
+	check(Main.percentile_text(d, 1) == "下位 31.2%（1回以下になる確率）", "少ない側は下位 (got %s)" % Main.percentile_text(d, 1))
+	check(Main.percentile_text(d, 4) == "上位 6.2%（4回以上になる確率）", "多い側は上位 (got %s)" % Main.percentile_text(d, 4))
+	check(Main.percentile_text(d, 2).begins_with("下位 68.8%"), "真ん中は小さいほう（同じなら下位）")
+
+	# シミュレーターの累計の分布は、期待値と平均が合い、合計が1
+	var p := Params.new()
+	p.max_carry = 100000000
+	var s := Sim.new(p)
+	s.rng.seed = 3
+	for i in 20:
+		s.advance(8 * 3600.0)
+		if i % 3 == 0:
+			s.drop()
+	var t := s.totals
+	check(absf(_pmf_sum(s.ingredient_dist.p) - 1.0) < 1e-6 and absf(s.ingredient_dist.mean() - t["exp_ingredient_helps"]) < 1e-6, "食材の分布：合計1・平均＝期待値 %.2f" % t["exp_ingredient_helps"])
+	check(absf(_pmf_sum(s.skill_dist.p) - 1.0) < 1e-6 and absf(s.skill_dist.mean() - t["exp_skills"]) < 1e-6, "スキルの分布：合計1・平均＝期待値 %.2f" % t["exp_skills"])
+	check(s.ingredient_dist.mass(t["ingredient_helps"]) > 0.0 and s.skill_dist.mass(t["skills"]) > 0.0, "実際の回数は分布の範囲内")
+	s.reset()
+	check(s.ingredient_dist.p.size() == 1 and s.skill_dist.mean() == 0.0, "リセットで0回だけの分布に戻る")
