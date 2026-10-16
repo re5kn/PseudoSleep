@@ -17,6 +17,8 @@ const Fairy = preload("res://scripts/fairy.gd")
 const FairyView = preload("res://scripts/fairy_view.gd")
 const Presets = preload("res://scripts/presets.gd")
 const Bed = preload("res://scripts/bed.gd")
+const Dist = preload("res://scripts/dist.gd")
+const DistChart = preload("res://scripts/dist_chart.gd")
 const FONT = preload("res://fonts/MPLUSRounded1c-Bold.ttf")
 
 const VIEW_SIZE := Vector2(720, 1280)
@@ -31,6 +33,10 @@ const DESK_POS := Vector2(606, 560)
 ## ベッド（「ねむる」の札付き）の中心
 const BED_POS := Vector2(478, 352)
 const SLEEP_POPUP_W := 380.0
+## 回数の確率分布のグラフを出す欄
+const DIST_POPUP_W := 600.0
+const DIST_POPUP_Y := 300.0
+const DIST_CHART_H := 300.0
 ## 睡眠時間（分）の刻みと範囲
 const SLEEP_STEP_MIN := 30
 const SLEEP_MIN_MIN := 30
@@ -142,6 +148,12 @@ var bubble_label: Label
 var sleep_popup: PanelContainer
 var sleep_time_label: Label
 var sleep_summary: Label
+## 食材回数・スキル回数の (i) で出す確率分布の欄。出している項目（"ingredient" か "skill"）、閉じていれば ""
+var dist_popup: PanelContainer
+var dist_popup_kind := ""
+var dist_title: Label
+var dist_chart: DistChart
+var dist_summary: RichTextLabel
 var blocker: Control
 var settings: SettingsPanel
 var settings_scrim: ColorRect
@@ -271,7 +283,10 @@ func _build_field() -> void:
 	hud_label.fit_content = true
 	hud_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	hud_label.scroll_active = false
-	hud_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# 食材回数・スキル回数の (i) を押せるようにする（それ以外の場所はフィールドへ通す）
+	hud_label.mouse_filter = Control.MOUSE_FILTER_PASS
+	hud_label.meta_underlined = false
+	hud_label.meta_clicked.connect(_on_hud_meta_clicked)
 	hud_label.add_theme_font_size_override("normal_font_size", 20)
 	hud_label.add_theme_color_override("default_color", TEXT_DARK)
 	hud.add_child(hud_label)
@@ -453,6 +468,7 @@ func _build_overlays() -> void:
 
 	_build_fairy_popup(layer)
 	_build_sleep_popup(layer)
+	_build_dist_popup(layer)
 
 	# カットイン中はタップをここで受け止める
 	var blocker_layer := _layer(5)
@@ -764,6 +780,114 @@ func _update_sleep_popup() -> void:
 	sleep_summary.text = "起きたときのげんき回復（100まで）：%s" % "・".join(parts)
 
 
+func _build_dist_popup(layer: CanvasLayer) -> void:
+	dist_popup = PanelContainer.new()
+	dist_popup.theme = SettingsPanel.make_theme(ui_theme)
+	dist_popup.visible = false
+	dist_popup.custom_minimum_size = Vector2(DIST_POPUP_W, 0)
+	var sb := _style(CREAM, 22, 12)
+	sb.set_border_width_all(3)
+	sb.border_color = Color("e6cf9f")
+	sb.shadow_color = Color(0, 0, 0, 0.3)
+	sb.shadow_size = 8
+	dist_popup.add_theme_stylebox_override("panel", sb)
+	layer.add_child(dist_popup)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	dist_popup.add_child(v)
+
+	var top := HBoxContainer.new()
+	v.add_child(top)
+	dist_title = _label("", 22)
+	dist_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(dist_title)
+	var close := _button("×", Color("ffe9bf"), TEXT_DARK)
+	close.custom_minimum_size = Vector2(48, 48)
+	close.add_theme_font_size_override("font_size", 24)
+	close.pressed.connect(_hide_dist_popup)
+	top.add_child(close)
+
+	dist_chart = DistChart.new()
+	dist_chart.custom_minimum_size = Vector2(0, DIST_CHART_H)
+	v.add_child(dist_chart)
+
+	dist_summary = RichTextLabel.new()
+	dist_summary.bbcode_enabled = true
+	dist_summary.fit_content = true
+	dist_summary.scroll_active = false
+	dist_summary.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dist_summary.custom_minimum_size = Vector2(DIST_POPUP_W - 40, 0)
+	dist_summary.add_theme_font_size_override("normal_font_size", 17)
+	dist_summary.add_theme_color_override("default_color", TEXT_DARK)
+	v.add_child(dist_summary)
+
+
+func _on_hud_meta_clicked(meta: Variant) -> void:
+	# フィールドのタップとして扱わない（_unhandled_input で欄が閉じないように）
+	get_viewport().set_input_as_handled()
+	if cutin_active:
+		return
+	var kind := str(meta)
+	if dist_popup.visible and dist_popup_kind == kind:
+		_hide_dist_popup()
+		return
+	_hide_box_popup()
+	_hide_fairy_popup()
+	_hide_sleep_popup()
+	dist_popup_kind = kind
+	_update_dist_popup()
+	dist_popup.reset_size()
+	dist_popup.position = Vector2((VIEW_SIZE.x - DIST_POPUP_W) / 2, DIST_POPUP_Y)
+	dist_popup.visible = true
+	# 説明文の折り返しが決まってから高さを合わせる
+	dist_popup.reset_size.call_deferred()
+
+
+func _hide_dist_popup() -> void:
+	dist_popup.visible = false
+	dist_popup_kind = ""
+
+
+## 確率分布のグラフと、実際の回数が分布のどこにいるか（下位・上位○%）
+func _update_dist_popup() -> void:
+	var d: Dist
+	var actual: int
+	var name: String
+	if dist_popup_kind == "skill":
+		d = sim.skill_dist
+		actual = sim.totals["skills"]
+		name = "スキル回数"
+	else:
+		d = sim.ingredient_dist
+		actual = sim.totals["ingredient_helps"]
+		name = "食材回数"
+	dist_title.text = "%sの確率分布" % name
+	dist_chart.show_dist(d, actual)
+	var actual_text := "[color=%s]実際の%d回[/color]" % [DistChart.ACTUAL_COLOR.to_html(false), actual]
+	var lines := PackedStringArray()
+	lines.append("%sは %s" % [actual_text, percentile_text(d, actual)])
+	lines.append("[color=%s]期待値 %.1f回[/color]（点線）" % [DistChart.MEAN_COLOR.to_html(false), d.mean()])
+	lines.append("[font_size=14][color=#8a7660]横軸は回数、縦軸はその回数になる確率。「すすめる」ごとに、その時点の不発カウントとストックから求めて足し合わせています。[/color][/font_size]")
+	dist_summary.text = "\n".join(lines)
+
+
+## 実際の回数 x が分布の下側・上側のどちらに寄っているかを「下位○%」「上位○%」で表す。
+## 下位は x 回以下になる確率、上位は x 回以上になる確率で、小さいほうを出す。
+static func percentile_text(d: Dist, x: int) -> String:
+	var lower := d.at_most(x)
+	var upper := d.at_least(x)
+	if lower <= upper:
+		return "下位 %s（%d回以下になる確率）" % [_pct_text(lower), x]
+	return "上位 %s（%d回以上になる確率）" % [_pct_text(upper), x]
+
+
+static func _pct_text(v: float) -> String:
+	var pct := v * 100.0
+	if pct < 0.1:
+		return "0.1%未満"
+	return "%.1f%%" % pct
+
+
 ## 眠る。そのあいだもおてつだいは進み、起きた時点でげんきが回復する。妖精は回復するものだけが眠る
 func _on_sleep() -> void:
 	if cutin_active:
@@ -1055,6 +1179,7 @@ func _on_reset() -> void:
 		t.queue_free()
 	_hide_box_popup()
 	_hide_sleep_popup()
+	_hide_dist_popup()
 	_refresh()
 
 
@@ -1095,6 +1220,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	_hide_fairy_popup()
 	var had_sleep_popup := sleep_popup.visible
 	_hide_sleep_popup()
+	_hide_dist_popup()
 	for id in piles:
 		if piles[id].hit(p):
 			swiped[id] = true
@@ -1360,6 +1486,12 @@ func _expected_text(v: float) -> String:
 	return "（%.1f）" % v
 
 
+## 期待値の横の (i)。押すと確率分布のグラフを出す（_on_hud_meta_clicked）。
+## 指でも押しやすいよう、前後の空白も押せる範囲に入れる
+func _info_link(kind: String) -> String:
+	return "[url=%s][color=%s] ⓘ  [/color][/url]" % [kind, DistChart.MEAN_COLOR.to_html(false)]
+
+
 func _format_hours(sec: float) -> String:
 	var total_min := int(round(sec / 60.0))
 	return "%d時間%02d分" % [total_min / 60, total_min % 60]
@@ -1387,8 +1519,8 @@ func _refresh() -> void:
 	var rows := [
 		["おてつだい回数", "%d回" % t["helps"], "（）内は期待値"],
 		["きのみ回数", "%d回" % t["berry_helps"], _expected_text(t["exp_berry_helps"])],
-		["食材回数", "%d回" % t["ingredient_helps"], _expected_text(t["exp_ingredient_helps"])],
-		["スキル回数", "%d回" % t["skills"], _expected_text(t["exp_skills"])],
+		["食材回数", "%d回" % t["ingredient_helps"], _expected_text(t["exp_ingredient_helps"]) + _info_link("ingredient")],
+		["スキル回数", "%d回" % t["skills"], _expected_text(t["exp_skills"]) + _info_link("skill")],
 		["　うち天井", ceiling_count, ""],
 		["いつのまに育成回数", "%d回" % t["full_helps"], ""],
 	]
@@ -1398,6 +1530,8 @@ func _refresh() -> void:
 	table += "[/table]"
 	hud_label.text = "%s（Lv.%d）\n経過 %s ・ げんき %s\n%s" % [
 		sim.params.pseudon_name, sim.params.level, _format_hours(sim.elapsed_sec), genki, table]
+	if dist_popup.visible:
+		_update_dist_popup()
 
 	pseudon.show_icon = sim.has_icon()
 	pseudon.show_menu = not pseudon.show_icon and not settings_open
