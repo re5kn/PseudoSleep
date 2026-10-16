@@ -867,7 +867,6 @@ func _update_dist_popup() -> void:
 	var lines := PackedStringArray()
 	lines.append("%sは %s" % [actual_text, percentile_text(d, actual)])
 	lines.append("[color=%s]期待値 %.1f回[/color]（点線）" % [DistChart.MEAN_COLOR.to_html(false), d.mean()])
-	lines.append("[font_size=14][color=#8a7660]横軸は回数、縦軸はその回数になる確率。「すすめる」ごとに、その時点の不発カウントとストックから求めて足し合わせています。[/color][/font_size]")
 	dist_summary.text = "\n".join(lines)
 
 
