@@ -15,6 +15,9 @@ const PAD_BOTTOM := 44.0
 const BAR_COLOR := Color("f2b56b")
 const ACTUAL_COLOR := Color("d9534f")
 const MEAN_COLOR := Color("4a78c2")
+## 期待値まわりの範囲（CENTRAL の確率で入る回数）の背景
+const BAND_COLOR := Color("d6e6fa")
+const CENTRAL := 0.7
 const AXIS_COLOR := Color("8a7660")
 const TEXT_COLOR := Color("5a4632")
 const FONT_SIZE := 14
@@ -56,6 +59,12 @@ func _draw() -> void:
 
 	var plot := Rect2(PAD_LEFT, PAD_TOP, size.x - PAD_LEFT - PAD_RIGHT, size.y - PAD_TOP - PAD_BOTTOM)
 	var bar_w := plot.size.x / bars
+
+	# 期待値まわり70%の範囲の背景（棒をまとめていても回数の位置で塗る）
+	var band := dist.central(CENTRAL)
+	var bx0 := plot.position.x + float(band.x - first) / width * bar_w
+	var bx1 := plot.position.x + float(band.y + 1 - first) / width * bar_w
+	draw_rect(Rect2(bx0, plot.position.y, bx1 - bx0, plot.size.y), BAND_COLOR)
 
 	# 縦軸（確率質量、%）の目盛り
 	for i in Y_TICKS + 1:

@@ -81,6 +81,22 @@ func at_least(x: int) -> float:
 	return minf(s, 1.0)
 
 
+## 確率 prob 以上で x 回以下になる、最小の x（下位 prob の位置）
+func quantile(prob: float) -> int:
+	var s := 0.0
+	for i in p.size():
+		s += p[i]
+		if s >= prob - 1e-12:
+			return offset + i
+	return offset + p.size() - 1
+
+
+## 期待値まわりで、確率 prob で入る回数の範囲（下位・上位 (1−prob)/2 ずつを除く）
+func central(prob: float) -> Vector2i:
+	var tail := (1.0 - prob) / 2.0
+	return Vector2i(quantile(tail), quantile(1.0 - tail))
+
+
 ## 下側・上側の端からそれぞれ確率 tail ぶんを除いた回数の範囲（グラフの表示範囲用）
 func span(tail: float) -> Vector2i:
 	var s := 0.0
