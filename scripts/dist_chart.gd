@@ -18,6 +18,14 @@ const MEAN_COLOR := Color("4a78c2")
 ## 期待値まわりの範囲（CENTRAL の確率で入る回数）の背景
 const BAND_COLOR := Color("d6e6fa")
 const CENTRAL := 0.7
+## 端の背景。[下位の確率の位置から, 上位の確率の位置まで, 色]（下位は赤系、上位は緑系）
+## 下位5%・下位10%（期待値まわりの範囲の手前、15%まで）、上位10%（85%から）・上位5%
+const TAIL_BANDS := [
+	[0.0, 0.05, Color("f4c2c2")],
+	[0.05, 0.15, Color("fae0e0")],
+	[0.85, 0.95, Color("dcefd6")],
+	[0.95, 1.0, Color("b9dfae")],
+]
 const AXIS_COLOR := Color("8a7660")
 const TEXT_COLOR := Color("5a4632")
 const FONT_SIZE := 14
@@ -65,6 +73,13 @@ func _draw() -> void:
 	var bx0 := plot.position.x + (band.x - first + 0.5) / width * bar_w
 	var bx1 := plot.position.x + (band.y - first + 0.5) / width * bar_w
 	draw_rect(Rect2(bx0, plot.position.y, bx1 - bx0, plot.size.y), BAND_COLOR)
+	# 下位5%・10%、上位10%・5%の背景（グラフの端より外は塗らない）。期待値まわりの範囲とすき間なく並ぶ
+	for t in TAIL_BANDS:
+		var a := plot.position.x + (dist.quantile(t[0]) - first + 0.5) / width * bar_w
+		var z := plot.position.x + (dist.quantile(t[1]) - first + 0.5) / width * bar_w
+		a = clampf(a, plot.position.x, plot.end.x)
+		z = clampf(z, plot.position.x, plot.end.x)
+		draw_rect(Rect2(a, plot.position.y, z - a, plot.size.y), t[2])
 
 	# 縦軸（確率質量、%）の目盛り
 	for i in Y_TICKS + 1:
