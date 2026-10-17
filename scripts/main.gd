@@ -37,6 +37,8 @@ const SLEEP_POPUP_W := 380.0
 const DIST_POPUP_W := 600.0
 const DIST_POPUP_Y := 300.0
 const DIST_CHART_H := 300.0
+## DistChart.TAIL_BANDS の各背景の名前（説明文の色見本に出す）
+const TAIL_BAND_NAMES := ["下位5%", "下位5〜15%", "上位5〜15%", "上位5%"]
 ## 睡眠時間（分）の刻みと範囲
 const SLEEP_STEP_MIN := 30
 const SLEEP_MIN_MIN := 30
@@ -868,6 +870,13 @@ func _update_dist_popup() -> void:
 	lines.append("%sは %s" % [actual_text, percentile_text(d, actual)])
 	lines.append("[color=%s]期待値 %.1f回[/color]（点線）" % [DistChart.MEAN_COLOR.to_html(false), d.mean()])
 	lines.append("薄い青の範囲は、期待値まわり70%の範囲です。")
+	# 端の背景の色見本（DistChart.TAIL_BANDS の順：下位5%・下位5〜15%・上位5〜15%・上位5%）
+	var chips := PackedStringArray()
+	for i in DistChart.TAIL_BANDS.size():
+		var c: Color = DistChart.TAIL_BANDS[i][2]
+		chips.append("[bgcolor=%s] %s [/bgcolor]" % [c.to_html(false), TAIL_BAND_NAMES[i]])
+	lines.append("赤系は下位、緑系は上位の範囲です。")
+	lines.append(" ".join(chips))
 	dist_summary.text = "\n".join(lines)
 
 
