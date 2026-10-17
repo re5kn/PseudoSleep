@@ -1,0 +1,140 @@
+extends Control
+## 回数の確率分布の棒グラフ。横軸が回数、縦軸が確率質量。
+## 実際の回数の棒を色を変えて示し、期待値の位置に縦の破線を引く。
+
+const Dist = preload("res://scripts/dist.gd")
+
+## 棒の数がこれを超えるときは、何回分かずつまとめて1本にする
+const MAX_BARS := 60
+## 表示範囲の外に残す確率（両端それぞれ）
+const TAIL := 0.0005
+const PAD_LEFT := 64.0
+const PAD_RIGHT := 12.0
+const PAD_TOP := 12.0
+const PAD_BOTTOM := 44.0
+const BAR_COLOR := Color("f2b56b")
+## 現時点の回数の棒（背景の赤・緑・青、期待値の青い破線と重ならない紫）
+const ACTUAL_COLOR := Color("8a4fb8")
+const MEAN_COLOR := Color("4a78c2")
+## 期待値まわりの範囲（CENTRAL の確率で入る回数）の背景
+const BAND_COLOR := Color("d6e6fa")
+const CENTRAL := 0.7
+## 端の背景。[下位の確率の位置から, 上位の確率の位置まで, 色]（下位は赤系、上位は緑系）
+## 下位5%・下位10%（期待値まわりの範囲の手前、15%まで）、上位10%（85%から）・上位5%
+const TAIL_BANDS := [
+	[0.0, 0.05, Color("f4c2c2")],
+	[0.05, 0.15, Color("fae0e0")],
+	[0.85, 0.95, Color("dcefd6")],
+	[0.95, 1.0, Color("b9dfae")],
+]
+const AXIS_COLOR := Color("8a7660")
+const TEXT_COLOR := Color("5a4632")
+const FONT_SIZE := 14
+## 縦軸の目盛りの区切り数（上端が 1, 2, 2.5, 5 × 10^n なので、きりのよい値になる）
+const Y_TICKS := 5
+
+var dist: Dist
+var actual := 0
+var mean := 0.0
+
+
+func show_dist(d: Dist, actual_count: int) -> void:
+	dist = d
+	actual = actual_count
+	mean = d.mean()
+	queue_redraw()
+
+
+func _draw() -> void:
+	if dist == null:
+		return
+	var font := get_theme_default_font()
+	var span := dist.span(TAIL)
+	var first := mini(span.x, actual)
+	var last := maxi(span.y, actual)
+	var width := ceili(float(last - first + 1) / MAX_BARS)
+	# まとめる単位の倍数から始めて、棒の区切りをそろえる
+	first -= posmod(first, width)
+	var bars := (last - first) / width + 1
+	var masses := PackedFloat64Array()
+	masses.resize(bars)
+	for b in bars:
+		for x in range(first + b * width, first + (b + 1) * width):
+			masses[b] += dist.mass(x)
+	var top := 0.0
+	for m in masses:
+		top = maxf(top, m)
+	var y_max := _nice_ceil(top)
+
+	var plot := Rect2(PAD_LEFT, PAD_TOP, size.x - PAD_LEFT - PAD_RIGHT, size.y - PAD_TOP - PAD_BOTTOM)
+	var bar_w := plot.size.x / bars
+
+	# 期待値まわり70%の範囲の背景。端は小数なので棒の途中に来る（棒をまとめていても回数の位置で塗る）
+	var band := dist.central(CENTRAL)
+	var bx0 := plot.position.x + (band.x - first + 0.5) / width * bar_w
+	var bx1 := plot.position.x + (band.y - first + 0.5) / width * bar_w
+	draw_rect(Rect2(bx0, plot.position.y, bx1 - bx0, plot.size.y), BAND_COLOR)
+	# 下位5%・10%、上位10%・5%の背景（グラフの端より外は塗らない）。期待値まわりの範囲とすき間なく並ぶ
+	for t in TAIL_BANDS:
+		var a := plot.position.x + (dist.quantile(t[0]) - first + 0.5) / width * bar_w
+		var z := plot.position.x + (dist.quantile(t[1]) - first + 0.5) / width * bar_w
+		a = clampf(a, plot.position.x, plot.end.x)
+		z = clampf(z, plot.position.x, plot.end.x)
+		draw_rect(Rect2(a, plot.position.y, z - a, plot.size.y), t[2])
+
+	# 縦軸（確率質量、%）の目盛り
+	for i in Y_TICKS + 1:
+		var v := y_max * i / float(Y_TICKS)
+		var y := plot.end.y - plot.size.y * i / float(Y_TICKS)
+		draw_line(Vector2(plot.position.x, y), Vector2(plot.end.x, y), Color(AXIS_COLOR, 0.25), 1.0)
+		var label := _percent(v)
+		var tw := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x
+		draw_string(font, Vector2(plot.position.x - tw - 6, y + FONT_SIZE * 0.35), label,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, TEXT_COLOR)
+
+	for b in bars:
+		var h := plot.size.y * masses[b] / y_max if y_max > 0.0 else 0.0
+		var lo := first + b * width
+		var has_actual := actual >= lo and actual < lo + width
+		var r := Rect2(plot.position.x + b * bar_w + 1, plot.end.y - h, maxf(1.0, bar_w - 2), h)
+		draw_rect(r, ACTUAL_COLOR if has_actual else BAR_COLOR)
+
+	draw_line(Vector2(plot.position.x, plot.end.y), plot.end, AXIS_COLOR, 2.0)
+	draw_line(plot.position, Vector2(plot.position.x, plot.end.y), AXIS_COLOR, 2.0)
+
+	# 期待値の位置（棒の中心が回数にあたる）
+	var mx := plot.position.x + ((mean - first) / width + 0.5) * bar_w
+	draw_dashed_line(Vector2(mx, plot.position.y), Vector2(mx, plot.end.y), MEAN_COLOR, 4.0, 6.0)
+
+	# 横軸（回数）の目盛り。棒が多いときは間引く
+	var step := maxi(1, ceili(bars / 8.0))
+	for b in range(0, bars, step):
+		var label := str(first + b * width)
+		if width > 1:
+			label += "〜"
+		var cx := plot.position.x + (b + 0.5) * bar_w
+		var tw := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x
+		draw_string(font, Vector2(cx - tw / 2, plot.end.y + FONT_SIZE + 6), label,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, TEXT_COLOR)
+	var x_title := "回数"
+	var xw := font.get_string_size(x_title, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x
+	draw_string(font, Vector2(plot.end.x - xw, size.y - 4), x_title,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, TEXT_COLOR)
+
+
+## 目盛りの上端（1, 2, 2.5, 5 × 10^n のうち v 以上の最小）
+static func _nice_ceil(v: float) -> float:
+	if v <= 0.0:
+		return 1.0
+	var e := pow(10.0, floorf(log(v) / log(10.0)))
+	for m in [1.0, 2.0, 2.5, 5.0, 10.0]:
+		if m * e >= v - 1e-12:
+			return m * e
+	return 10.0 * e
+
+
+static func _percent(v: float) -> String:
+	var pct := v * 100.0
+	if absf(pct - roundf(pct)) < 1e-6:
+		return "%d%%" % roundi(pct)
+	return "%.1f%%" % pct

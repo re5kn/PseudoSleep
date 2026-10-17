@@ -8,6 +8,8 @@ const Sim = preload("res://scripts/sim.gd")
 const Params = preload("res://scripts/params.gd")
 const FieldClock = preload("res://scripts/field_clock.gd")
 const Presets = preload("res://scripts/presets.gd")
+const Dist = preload("res://scripts/dist.gd")
+const Main = preload("res://scripts/main.gd")
 
 var failures := 0
 
@@ -42,6 +44,8 @@ func _init() -> void:
 	_test_skill_stock()
 	_test_collect_limits()
 	_test_time_phase()
+	_test_expected_values()
+	_test_distributions()
 	if failures == 0:
 		print("ALL TESTS PASSED")
 	else:
@@ -820,3 +824,108 @@ func _test_time_phase() -> void:
 	check(FieldClock.day_and_clock(23 * 3600.0 + 59 * 60 + 59) == [1, "3:59"], "elapsed 23:59:59 -> day 1 3:59")
 	check(FieldClock.day_and_clock(24 * 3600.0) == [2, "4:00"], "elapsed 24h -> day 2 4:00")
 	check(FieldClock.day_and_clock(51 * 3600.0 + 30 * 60) == [3, "7:30"], "elapsed 51.5h -> day 3 7:30")
+
+
+## 期待値（#71）。「すすめる」1回ごとに、おてつだい回数から求めて足していく。スキルは天井込み
+func _test_expected_values() -> void:
+	print("期待値の表示（食材は二項分布、スキルは天井込み）")
+	var none := 1000000
+	check(absf(Sim.skill_mean(30, 0.039, none, 2, 0, 0) - 1.025) < 0.001, "天井に届かなければ B(30, 3.9%%)を上限2で打ち切った1.025回 (got %.4f)" % Sim.skill_mean(30, 0.039, none, 2, 0, 0))
+	check(absf(Sim.skill_mean(30, 0.039, none, 1, 0, 0) - (1.0 - pow(0.961, 30))) < 1e-9, "上限1なら1−P(0)")
+	check(absf(Sim.skill_mean(5, 0.3, none, 99, 0, 0) - 1.5) < 1e-9, "上限が十分大きく天井もなければ k×p")
+	check(absf(Sim.skill_mean(30, 0.039, 65, 2, 35, 0) - 1.025) < 0.001, "不発35から30回では天井65に届かないので1.025回")
+	check(absf(Sim.skill_mean(30, 0.039, 65, 2, 36, 0) - 1.328) < 0.001, "不発36からなら30回目までに天井に届いて1.328回 (got %.4f)" % Sim.skill_mean(30, 0.039, 65, 2, 36, 0))
+	check(absf(Sim.skill_mean(99, 0.039, 65, 2, 0, 0) - 1.9544) < 0.0001, "不発0から99回で1.9544回")
+	check(absf(Sim.skill_mean(6, 0.0, 5, 2, 0, 0) - 1.0) < 1e-9, "確率0でも天井5なら6回目で必ず1回")
+	check(Sim.skill_mean(10, 0.5, 65, 2, 0, 2) == 0.0 and Sim.skill_mean(0, 0.5, 65, 2, 0, 0) == 0.0, "空きがない、またはおてつだい0回なら0")
+
+	var p := Params.new()
+	p.max_carry = 1000000
+	p.max_skill_stock = 2
+	var s := Sim.new(p)
+	var r := s.advance(p.help_sec() * 0.45 * 30 + 1)
+	var k: int = r["helps"]
+	var q := p.ingredient_chance()
+	check(k == 30, "30回おてつだい (got %d)" % k)
+	check(absf(r["exp_ingredient_helps"] - k * q) < 1e-9 and absf(r["exp_berry_helps"] - k * (1.0 - q)) < 1e-9, "食材は k×食材確率、きのみは k×(1−食材確率)")
+	var e1 := Sim.skill_mean(k, p.skill_chance(), p.skill_ceiling, 2, 0, 0)
+	check(absf(r["exp_skills"] - e1) < 1e-9, "スキルは不発0・ストック0から天井込みで求める")
+	var miss := s.skill_miss
+	var stock := s.skill_stock
+	r = s.advance(p.help_sec() * 0.45 * 10)
+	check(absf(r["exp_skills"] - Sim.skill_mean(r["helps"], p.skill_chance(), p.skill_ceiling, 2, miss, stock)) < 1e-9, "タップせずに進めると、そのときの不発カウントとストックから求める (miss %d, stock %d)" % [miss, stock])
+	check(absf(s.totals["exp_skills"] - (e1 + r["exp_skills"])) < 1e-9, "累計は「すすめる」ごとの期待値の合計")
+
+	# 天井込みの期待値は、実際の回数の平均と合う（タップしながら24時間ずつ200日）
+	var p3 := Params.new()
+	p3.max_carry = 100000000
+	var s3 := Sim.new(p3)
+	s3.rng.seed = 7
+	for d in 200:
+		s3.advance(24 * 3600.0)
+		s3.drop()
+	var t3 := s3.totals
+	check(absf(t3["skills"] - t3["exp_skills"]) < 4.0 * sqrt(t3["exp_skills"] * 0.05), "24時間ずつ200日でスキル%d回、期待値%.1f回" % [t3["skills"], t3["exp_skills"]])
+
+	# いつのまに育成のおてつだいは数えない
+	var p2 := Params.new()
+	p2.max_carry = 3
+	p2.berries_per_help = 1
+	p2.ingredient_prob = 0.0
+	var s2 := Sim.new(p2)
+	r = s2.advance(p2.help_sec() * 0.45 * 10 + 1)
+	check(r["full_helps"] == 7 and absf(r["exp_berry_helps"] - 3.0) < 1e-9, "いつのまに育成の7回は除いて、きのみ3回 (full %d, exp %.2f)" % [r["full_helps"], r["exp_berry_helps"]])
+
+
+func _pmf_sum(pmf: PackedFloat64Array) -> float:
+	var t := 0.0
+	for v in pmf:
+		t += v
+	return t
+
+
+func _test_distributions() -> void:
+	print("回数の確率分布（(i) のグラフ）")
+	var b := Dist.binomial(4, 0.5)
+	check(b.size() == 5 and absf(b[0] - 0.0625) < 1e-12 and absf(b[2] - 0.375) < 1e-12, "B(4, 0.5) = 1/16, 4/16, 6/16, 4/16, 1/16")
+	var big := Dist.binomial(5000, 0.2)
+	check(absf(_pmf_sum(big) - 1.0) < 1e-9 and absf(Sim.pmf_mean(big) - 1000.0) < 1e-6, "k=5000 でもあふれず合計1、平均 k×q")
+	check(Dist.binomial(3, 0.0)[0] == 1.0 and Dist.binomial(3, 1.0)[3] == 1.0, "確率0・1の端")
+
+	var sp := Sim.skill_pmf(30, 0.039, 1000000, 2, 0, 0)
+	check(sp.size() == 3 and absf(sp[0] - pow(0.961, 30)) < 1e-9 and absf(_pmf_sum(sp) - 1.0) < 1e-9, "スキル30回・上限2：0回の確率は 0.961^30")
+	sp = Sim.skill_pmf(30, 0.039, 65, 2, 36, 0)
+	check(sp[0] == 0.0, "不発36から30回なら天井で0回はない")
+	check(Sim.skill_pmf(5, 0.5, 65, 2, 0, 2).size() == 1, "ストックが上限なら0回だけ")
+
+	var d := Dist.new()
+	d.add(Dist.binomial(2, 0.5))
+	d.add(Dist.binomial(2, 0.5))
+	check(absf(d.mass(2) - 0.375) < 1e-12 and absf(d.mean() - 2.0) < 1e-12, "たたみ込み：B(2,½)+B(2,½) = B(4,½)")
+	check(absf(d.at_most(1) - 0.3125) < 1e-12 and absf(d.at_least(3) - 0.3125) < 1e-12, "1回以下・3回以上は 5/16")
+	check(Main.percentile_text(d, 1) == "下位 31.2%（1回以下になる確率）", "少ない側は下位 (got %s)" % Main.percentile_text(d, 1))
+	check(Main.percentile_text(d, 4) == "上位 6.2%（4回以上になる確率）", "多い側は上位 (got %s)" % Main.percentile_text(d, 4))
+	check(Main.percentile_text(d, 2).begins_with("下位 68.8%"), "真ん中は小さいほう（同じなら下位）")
+	# B(4,½)：0回 1/16、1回 4/16。下位15%%は1回の棒（0.5〜1.5）の (0.15−0.0625)/0.25 = 0.35 の位置
+	check(absf(d.quantile(0.15) - 0.85) < 1e-9 and absf(d.quantile(0.85) - 3.15) < 1e-9, "B(4,½) の期待値まわり70%%は0.85〜3.15回 (got %s)" % d.central(0.7))
+	check(absf(d.quantile(0.5) - 2.0) < 1e-9, "真ん中は2回の棒の中央")
+	var wide := Dist.new()
+	wide.add(Dist.binomial(1000, 0.2))
+	var band := wide.central(0.7)
+	check(band.x < 200 and band.y > 200 and absf((band.y - band.x) - 2.0 * 1.0364 * sqrt(160.0)) < 1.0, "B(1000,0.2) の70%%範囲 %s は正規近似の ±1.036σ とほぼ同じ" % band)
+
+	# シミュレーターの累計の分布は、期待値と平均が合い、合計が1
+	var p := Params.new()
+	p.max_carry = 100000000
+	var s := Sim.new(p)
+	s.rng.seed = 3
+	for i in 20:
+		s.advance(8 * 3600.0)
+		if i % 3 == 0:
+			s.drop()
+	var t := s.totals
+	check(absf(_pmf_sum(s.ingredient_dist.p) - 1.0) < 1e-6 and absf(s.ingredient_dist.mean() - t["exp_ingredient_helps"]) < 1e-6, "食材の分布：合計1・平均＝期待値 %.2f" % t["exp_ingredient_helps"])
+	check(absf(_pmf_sum(s.skill_dist.p) - 1.0) < 1e-6 and absf(s.skill_dist.mean() - t["exp_skills"]) < 1e-6, "スキルの分布：合計1・平均＝期待値 %.2f" % t["exp_skills"])
+	check(s.ingredient_dist.mass(t["ingredient_helps"]) > 0.0 and s.skill_dist.mass(t["skills"]) > 0.0, "実際の回数は分布の範囲内")
+	s.reset()
+	check(s.ingredient_dist.p.size() == 1 and s.skill_dist.mean() == 0.0, "リセットで0回だけの分布に戻る")
