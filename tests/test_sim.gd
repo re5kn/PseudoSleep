@@ -906,12 +906,13 @@ func _test_distributions() -> void:
 	check(Main.percentile_text(d, 1) == "下位 31.2%（1回以下になる確率）", "少ない側は下位 (got %s)" % Main.percentile_text(d, 1))
 	check(Main.percentile_text(d, 4) == "上位 6.2%（4回以上になる確率）", "多い側は上位 (got %s)" % Main.percentile_text(d, 4))
 	check(Main.percentile_text(d, 2).begins_with("下位 68.8%"), "真ん中は小さいほう（同じなら下位）")
-	check(d.quantile(0.15) == 1 and d.quantile(0.85) == 3 and d.central(0.7) == Vector2i(1, 3), "B(4,½) の期待値まわり70%%は1〜3回 (got %s)" % d.central(0.7))
+	# B(4,½)：0回 1/16、1回 4/16。下位15%%は1回の棒（0.5〜1.5）の (0.15−0.0625)/0.25 = 0.35 の位置
+	check(absf(d.quantile(0.15) - 0.85) < 1e-9 and absf(d.quantile(0.85) - 3.15) < 1e-9, "B(4,½) の期待値まわり70%%は0.85〜3.15回 (got %s)" % d.central(0.7))
+	check(absf(d.quantile(0.5) - 2.0) < 1e-9, "真ん中は2回の棒の中央")
 	var wide := Dist.new()
 	wide.add(Dist.binomial(1000, 0.2))
 	var band := wide.central(0.7)
-	var inside := wide.at_most(band.y) - wide.at_most(band.x - 1)
-	check(inside >= 0.7 and inside < 0.75 and band.x < 200 and band.y > 200, "B(1000,0.2) の70%%範囲 %s に入る確率 %.3f" % [band, inside])
+	check(band.x < 200 and band.y > 200 and absf((band.y - band.x) - 2.0 * 1.0364 * sqrt(160.0)) < 1.0, "B(1000,0.2) の70%%範囲 %s は正規近似の ±1.036σ とほぼ同じ" % band)
 
 	# シミュレーターの累計の分布は、期待値と平均が合い、合計が1
 	var p := Params.new()

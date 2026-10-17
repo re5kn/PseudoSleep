@@ -60,10 +60,10 @@ func _draw() -> void:
 	var plot := Rect2(PAD_LEFT, PAD_TOP, size.x - PAD_LEFT - PAD_RIGHT, size.y - PAD_TOP - PAD_BOTTOM)
 	var bar_w := plot.size.x / bars
 
-	# 期待値まわり70%の範囲の背景（棒をまとめていても回数の位置で塗る）
+	# 期待値まわり70%の範囲の背景。端は小数なので棒の途中に来る（棒をまとめていても回数の位置で塗る）
 	var band := dist.central(CENTRAL)
-	var bx0 := plot.position.x + float(band.x - first) / width * bar_w
-	var bx1 := plot.position.x + float(band.y + 1 - first) / width * bar_w
+	var bx0 := plot.position.x + (band.x - first + 0.5) / width * bar_w
+	var bx1 := plot.position.x + (band.y - first + 0.5) / width * bar_w
 	draw_rect(Rect2(bx0, plot.position.y, bx1 - bx0, plot.size.y), BAND_COLOR)
 
 	# 縦軸（確率質量、%）の目盛り
