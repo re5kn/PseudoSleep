@@ -13,7 +13,8 @@ const PAD_RIGHT := 12.0
 const PAD_TOP := 12.0
 const PAD_BOTTOM := 44.0
 const BAR_COLOR := Color("f2b56b")
-const ACTUAL_COLOR := Color("d9534f")
+## 現時点の回数の棒（背景の赤・緑・青、期待値の青い点線と重ならない紫）
+const ACTUAL_COLOR := Color("8a4fb8")
 const MEAN_COLOR := Color("4a78c2")
 ## 期待値まわりの範囲（CENTRAL の確率で入る回数）の背景
 const BAND_COLOR := Color("d6e6fa")
