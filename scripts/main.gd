@@ -866,7 +866,7 @@ func _update_dist_popup() -> void:
 	var actual_text := "[color=%s]現時点での%d回[/color]" % [DistChart.ACTUAL_COLOR.to_html(false), actual]
 	var lines := PackedStringArray()
 	lines.append("%sは %s" % [actual_text, percentile_text(d, actual)])
-	lines.append("[color=%s]期待値 %.1f回[/color]（点線）" % [DistChart.MEAN_COLOR.to_html(false), d.mean()])
+	lines.append("[color=%s]期待値 %.1f回[/color]（破線）" % [DistChart.MEAN_COLOR.to_html(false), d.mean()])
 	# 背景の色見本（グラフの左から：下位5%・下位5〜15%・期待値まわり70%・上位5〜15%・上位5%）
 	var bands := [
 		[DistChart.TAIL_BANDS[0][2], "下位5%"],

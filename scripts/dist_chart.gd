@@ -1,6 +1,6 @@
 extends Control
 ## 回数の確率分布の棒グラフ。横軸が回数、縦軸が確率質量。
-## 実際の回数の棒を色を変えて示し、期待値の位置に縦の点線を引く。
+## 実際の回数の棒を色を変えて示し、期待値の位置に縦の破線を引く。
 
 const Dist = preload("res://scripts/dist.gd")
 
@@ -13,7 +13,7 @@ const PAD_RIGHT := 12.0
 const PAD_TOP := 12.0
 const PAD_BOTTOM := 44.0
 const BAR_COLOR := Color("f2b56b")
-## 現時点の回数の棒（背景の赤・緑・青、期待値の青い点線と重ならない紫）
+## 現時点の回数の棒（背景の赤・緑・青、期待値の青い破線と重ならない紫）
 const ACTUAL_COLOR := Color("8a4fb8")
 const MEAN_COLOR := Color("4a78c2")
 ## 期待値まわりの範囲（CENTRAL の確率で入る回数）の背景
