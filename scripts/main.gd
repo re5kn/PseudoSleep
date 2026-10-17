@@ -867,7 +867,15 @@ func _update_dist_popup() -> void:
 	var lines := PackedStringArray()
 	lines.append("%sは %s" % [actual_text, percentile_text(d, actual)])
 	lines.append("[color=%s]期待値 %.1f回[/color]（点線）" % [DistChart.MEAN_COLOR.to_html(false), d.mean()])
+	var band := d.central(DistChart.CENTRAL)
+	# 回数は飛び飛びなので、ちょうど70%にはならない。範囲に入る実際の確率も添える
+	var inside := d.at_most(band.y) - d.at_most(band.x - 1)
+	lines.append("薄い青の範囲（%s）は、下位15%%と上位15%%を除いた、期待値まわり70%%の範囲です（回数が飛び飛びのため、この範囲に入る確率は %.1f%%）。" % [_count_range(band), inside * 100.0])
 	dist_summary.text = "\n".join(lines)
+
+
+static func _count_range(r: Vector2i) -> String:
+	return "%d回" % r.x if r.x == r.y else "%d〜%d回" % [r.x, r.y]
 
 
 ## 実際の回数 x が分布の下側・上側のどちらに寄っているかを「下位○%」「上位○%」で表す。
