@@ -863,7 +863,7 @@ func _update_dist_popup() -> void:
 		name = "食材回数"
 	dist_title.text = "%sの確率分布" % name
 	dist_chart.show_dist(d, actual)
-	var actual_text := "[color=%s]実際の%d回[/color]" % [DistChart.ACTUAL_COLOR.to_html(false), actual]
+	var actual_text := "[color=%s]現時点での%d回[/color]" % [DistChart.ACTUAL_COLOR.to_html(false), actual]
 	var lines := PackedStringArray()
 	lines.append("%sは %s" % [actual_text, percentile_text(d, actual)])
 	lines.append("[color=%s]期待値 %.1f回[/color]（点線）" % [DistChart.MEAN_COLOR.to_html(false), d.mean()])
